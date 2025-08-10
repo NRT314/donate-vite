@@ -1,0 +1,52 @@
+{
+  "en": {
+    "title": "Support Independent Organizations",
+    "connect_browser_button": "Connect Wallet (Browser)",
+    "disconnect_button": "Disconnect Wallet",
+    "donate_button": "Send Donation",
+    "switch_to_polygon": "Switch to Polygon",
+    "token_selection_title": "Select Donation Token (Polygon)",
+    "donations_title": "Your Donations",
+    "org_header": "Organization",
+    "amount_header": "Amount",
+    "total_amount_text": "Total Amount",
+    "status_approving": "Approval confirmation required in your wallet...",
+    "status_approve_wait": "Waiting for wallet interaction...",
+    "status_sending": "Sending donation... Please confirm in your wallet.",
+    "status_success": "✅ Thank you for your donation!",
+    "status_error": "❌ Error: ",
+    "org_names": {
+      "thisproject": "This Project",
+      "ovdinfo": "OVD-Info",
+      "mediazona": "Mediazona",
+      "zhuk": "Zhuk.World",
+      "breakfastshow": "The Breakfast Show",
+      "kovcheg": "Kovcheg.Live"
+    }
+  },
+  "ru": {
+    "title": "Поддержите независимые организации",
+    "connect_browser_button": "Подключить кошелёк (браузер)",
+    "disconnect_button": "Отключить кошелёк",
+    "donate_button": "Отправить пожертвование",
+    "switch_to_polygon": "Переключитесь на Polygon",
+    "token_selection_title": "Выберите токен для пожертвования (Polygon)",
+    "donations_title": "Ваши пожертвования",
+    "org_header": "Организация",
+    "amount_header": "Сумма",
+    "total_amount_text": "Итоговая сумма",
+    "status_approving": "Требуется подтверждение (approve) в кошельке...",
+    "status_approve_wait": "Ожидаем взаимодействия с кошельком...",
+    "status_sending": "Отправка доната... Пожалуйста, подтвердите в кошельке.",
+    "status_success": "✅ Спасибо за донат!",
+    "status_error": "❌ Ошибка: ",
+    "org_names": {
+      "thisproject": "Этот проект",
+      "ovdinfo": "ОВД-Инфо",
+      "mediazona": "Медиазона",
+      "zhuk": "Zhuk.World",
+      "breakfastshow": "The Breakfast Show",
+      "kovcheg": "Ковчег"
+    }
+  }
+}
