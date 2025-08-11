@@ -1,42 +1,105 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* src/App.css */
+/* --- Base Styles --- */
+body {
+    background-color: #f9fafb;
+    font-family: 'Inter', sans-serif;
+    color: #1f2937;
+    margin: 0;
+    padding: 1rem;
+}
+a { color: #2563eb; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* --- App Layout --- */
+.app-container { max-width: 1280px; margin: 0 auto; }
+.app-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+@media (min-width: 768px) {
+    .app-grid { grid-template-columns: repeat(5, 1fr); }
+}
+.sidebar { display: none; }
+@media (min-width: 768px) {
+    .sidebar { display: flex; flex-direction: column; gap: 1.5rem; grid-column: span 1 / span 1; }
+}
+.main-column {
+    background-color: #ffffff; padding: 1.5rem; border-radius: 0.75rem;
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    display: flex; flex-direction: column; gap: 1.5rem;
+}
+@media (min-width: 768px) {
+    .main-column { grid-column: span 3 / span 3; }
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
+/* --- Header Component --- */
+.header { margin-bottom: 2rem; }
+.header-top-row { display: flex; justify-content: space-between; align-items: center; height: 6rem; }
+.header-center-group { display: flex; justify-content: center; align-items: center; gap: 0.75rem; flex-grow: 1; }
+.header-logo { height: 3rem; }
+.header-title { font-size: 1.25rem; font-weight: bold; white-space: nowrap; display: none; }
+@media (min-width: 640px) { .header-title { display: block; } }
+.header-right-group { display: flex; align-items: center; gap: 1rem; }
+.header-lang-switcher { display: flex; gap: 0.25rem; }
+.lang-btn {
+    font-weight: bold; padding: 0.25rem 0.75rem; border-radius: 0.5rem; border: 2px solid transparent;
+    transition: all 0.2s ease-in-out; background: none; cursor: pointer;
 }
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
+.lang-btn.active { border-color: #2563eb; }
+.lang-btn:not(.active):hover { background-color: #f3f4f6; }
+.header-description { text-align: center; font-size: 1.125rem; color: #4b5563; }
+.header-description p { margin: 0.5rem 0; }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* --- Generic Components --- */
+.card { background: #f3f4f6; border-radius: 0.5rem; padding: 1rem; }
+.card--center-text { text-align: center; }
+.card__title { font-size: 1.5rem; font-weight: 600; margin-top: 0; margin-bottom: 0.75rem; }
+.button-group { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+.button {
+    padding: 10px 20px; border: 1px solid #ccc; background-color: #fff; border-radius: 8px;
+    cursor: pointer; font-weight: 500; transition: all 0.2s ease-in-out;
 }
+.button.active { background-color: #2563eb; color: white; border-color: #2563eb; }
+.button--primary {
+    background-color: #16a34a; color: white; font-size: 1.25rem; font-weight: bold;
+    padding: 1rem 2rem; border: none; border-radius: 0.5rem;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+.button--primary:hover:not(:disabled) { background-color: #15803d; }
+.button--primary:disabled { background-color: #ccc; cursor: not-allowed; }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
+/* --- Sidebar Components --- */
+.sidebar-card { background-color: #fff; padding: 1rem; border-radius: 0.5rem; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1); font-size: 0.875rem; }
+.sidebar-card__title { font-size: 1.125rem; font-weight: 600; margin: 0 0 0.5rem 0; }
+.sidebar-link-section { transition: all 0.2s ease-in-out; }
+.sidebar-link-section:hover { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
 
-.card {
-  padding: 2em;
-}
+/* --- Donation Form & Table --- */
+.donation-table { width: 100%; border-collapse: collapse; }
+.donation-table th, .donation-table td { padding: 0.75rem; text-align: left; border: 1px solid #d1d5db; }
+.donation-table thead tr { background-color: #e5e7eb; }
+.total-row { display: flex; justify-content: space-between; font-weight: bold; background-color: #e5e7eb; padding: 0.75rem; margin-top: -1px; border: 1px solid #d1d5db; }
+.preset-description { margin-bottom: 1rem; }
+.preset-input-container { display: flex; align-items: center; gap: 1rem; }
+.amount-input { width: 100%; box-sizing: border-box; padding: 0.5rem; border-radius: 0.375rem; border: 1px solid #d1d5db; }
+.preset-input { flex-grow: 1; }
+.action-section, .status-message { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+.spinner { display: inline-block; width: 20px; height: 20px; border: 3px solid rgba(0,0,0,0.1); border-radius: 50%; border-top-color: #2563eb; animation: spin 1s ease-in-out infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-.read-the-docs {
-  color: #888;
-}
+/* --- Other Component Styles --- */
+.faq-item { border-bottom: 1px solid #e5e7eb; }
+.faq-item:last-child { border-bottom: none; }
+.faq-item summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; }
+.faq-item summary::-webkit-details-marker { display: none; }
+.faq-item summary::after { content: '►'; transition: transform 0.2s; }
+.faq-item[open] summary::after { transform: rotate(90deg); }
+.faq-answer { padding-top: 0.5rem; }
+.contact-form { display: flex; flex-direction: column; gap: 0.5rem; }
+.form-input, .form-textarea { width: 100%; box-sizing: border-box; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; }
+.form-button { width: 100%; padding: 0.5rem; border-radius: 0.5rem; border: none; background-color: #2563eb; color: white; font-weight: bold; cursor: pointer; }
+.form-button:hover { background-color: #1d4ed8; }
+.form-status { font-size: 0.75rem; text-align: center; margin-top: 0.25rem; }
+.details-page-container { max-width: 56rem; margin: 0 auto; background: white; padding: 2rem; border-radius: 0.75rem; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1); }
+.details-page-container h1, .details-page-container h2, .details-page-container h3 { margin-top: 1.5em; margin-bottom: 0.5em; }
+.details-page-container ul { padding-left: 1.5rem; }
+
+/* --- Footer --- */
+.footer { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #d1d5db; font-size: 0.875rem; color: #6b7280; text-align: center; }
