@@ -60,7 +60,7 @@ export default function App() {
 
     const handleDonateClick = async () => {
         if (isButtonDisabled) return;
-        if (chain.id !== 137) {
+        if (chain && chain.id !== 137) {
             switchChain({ chainId: 137 });
             return;
         }
@@ -76,12 +76,13 @@ export default function App() {
             });
             setActiveTxHash(approveHash);
         } catch (error) {
+            console.error("Approve transaction error:", error);
             setStatus({ message: `${t.status_error} ${error.shortMessage || error.message}`, type: 'error' });
             setTransactionStage('idle');
         }
     };
 
-    const { isLoading, isSuccess } = useWaitForTransactionReceipt({ hash: activeTxHash });
+    const { isLoading, isSuccess, error: txError } = useWaitForTransactionReceipt({ hash: activeTxHash });
 
     useEffect(() => {
         if (isLoading) {
@@ -102,6 +103,7 @@ export default function App() {
                     ...donateArgs,
                 }).then(donateHash => setActiveTxHash(donateHash))
                   .catch(err => {
+                     console.error("Donate transaction error:", err);
                      setStatus({ message: `${t.status_error} ${err.shortMessage || err.message}`, type: 'error' });
                      setTransactionStage('idle');
                 });
@@ -116,10 +118,25 @@ export default function App() {
                 }, 5000);
             }
         }
-    }, [isSuccess, activeTxHash]);
+        if (txError) {
+            console.error("Transaction confirmation error:", txError);
+            setStatus({ message: `${t.status_error} ${txError.shortMessage || txError.message}`, type: 'error' });
+            setTransactionStage('idle');
+        }
+    }, [isSuccess, isLoading, txError, activeTxHash, donationType, recipients, amounts, parsedTotalAmount, selectedToken.address, t, writeContractAsync]);
 
     const handleAmountChange = (orgAddress, value) => {
-        setDonationAmounts(prev => ({ ...prev, [orgAddress]: value }));
+        const sanitizedValue = value.replace(',', '.');
+        if (sanitizedValue === '' || /^\d*\.?\d*$/.test(sanitizedValue)) {
+            setDonationAmounts(prev => ({ ...prev, [orgAddress]: sanitizedValue }));
+        }
+    };
+
+    const handlePresetAmountChange = (value) => {
+        const sanitizedValue = value.replace(',', '.');
+        if (sanitizedValue === '' || /^\d*\.?\d*$/.test(sanitizedValue)) {
+            setPresetAmount(sanitizedValue);
+        }
     };
 
     const MainView = () => (
@@ -174,10 +191,8 @@ export default function App() {
                                         <td><a href={org.link} target="_blank" rel="noopener noreferrer">{t.org_names[org.key]}</a></td>
                                         <td>
                                             <input
-                                                type="number"
+                                                type="text"
                                                 inputMode="decimal"
-                                                min="0"
-                                                step="0.01"
                                                 value={donationAmounts[org.address]}
                                                 onChange={e => handleAmountChange(org.address, e.target.value)}
                                                 placeholder="0.00"
@@ -200,12 +215,10 @@ export default function App() {
                         <p className="preset-description">{t.preset_description.replace('{count}', ORGS.length)}</p>
                         <div className="preset-input-container">
                                 <input
-                                type="number"
+                                type="text"
                                 inputMode="decimal"
-                                min="0"
-                                step="0.01"
                                 value={presetAmount}
-                                onChange={e => setPresetAmount(e.target.value)}
+                                onChange={e => handlePresetAmountChange(e.target.value)}
                                 placeholder="0.00"
                                 className="amount-input preset-input"
                                 disabled={status.type === 'pending'}
