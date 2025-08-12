@@ -1,7 +1,7 @@
 // src/main.tsx
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App.jsx'; // Note the .jsx extension
+import App from './App.jsx';
 import './App.css';
 
 import '@rainbow-me/rainbowkit/styles.css';
@@ -10,12 +10,17 @@ import { WagmiProvider } from 'wagmi';
 import { polygon } from 'wagmi/chains';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 
-// Get your projectId at https://cloud.walletconnect.com
-const projectId = 'YOUR_PROJECT_ID'; // Make sure you have this!
+// Загружаем projectId из переменной окружения
+// Vite автоматически подставит значение из .env
+const projectId = import.meta.env.VITE_PROJECT_ID;
+
+if (!projectId) {
+  console.error("❌ Ошибка: переменная окружения VITE_PROJECT_ID не установлена.");
+}
 
 const config = getDefaultConfig({
   appName: 'NRT Donate',
-  projectId: projectId,
+  projectId,
   chains: [polygon],
 });
 
