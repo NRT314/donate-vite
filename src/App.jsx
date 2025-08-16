@@ -1,6 +1,6 @@
 // src/App.jsx
-import React, { useState, useMemo } from 'react';
-import { useAccount, useSwitchChain, useWriteContract, usePublicClient } from 'wagmi';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useAccount, useSwitchChain, useWriteContract, usePublicClient, useWaitForTransactionReceipt } from 'wagmi';
 import { parseUnits } from 'viem';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 
@@ -10,12 +10,10 @@ import { CONTRACT_ADDRESS, TOKENS, ORGS, ABI, ERC20_ABI, initialAmounts, PRESET_
 import './App.css';
 import Header from './components/Header';
 import Footer from './components/Footer';
-import InfoCard from './components/InfoCard';
 import Faq from './components/Faq';
-import About from './components/About';
 import ContactForm from './components/ContactForm';
 import ContractDetails from './components/ContractDetails';
-import Plans from './components/Plans';
+import CollapsibleCard from './components/CollapsibleCard'; // Using the new component
 
 // --- STABLE MAINVIEW COMPONENT ---
 const MainView = ({ 
@@ -26,8 +24,24 @@ const MainView = ({
     chain
 }) => (
     <div className="app-grid">
-        <aside className="sidebar">
-            <About t={t} />
+        <aside className="sidebar sidebar-left">
+            <CollapsibleCard title={t.about_title}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.875rem' }}>
+                    <div>
+                        <h3 style={{ fontWeight: '600' }}>{t.about_section_idea_title}</h3>
+                        <p dangerouslySetInnerHTML={{ __html: t.about_section_idea_text }}></p>
+                    </div>
+                    <div>
+                        <h3 style={{ fontWeight: '600' }}>{t.about_section_why_polygon_title}</h3>
+                        <p dangerouslySetInnerHTML={{ __html: t.about_section_why_polygon_text }}></p>
+                    </div>
+                    <div>
+                        <h3 style={{ fontWeight: '600' }}>{t.about_section_what_is_nrt_title}</h3>
+                        <p dangerouslySetInnerHTML={{ __html: t.about_section_what_is_nrt_text }}></p>
+                    </div>
+                </div>
+            </CollapsibleCard>
+
             <div 
               className="sidebar-card sidebar-link-section"
               onClick={() => setCurrentPage('contract-details')}
@@ -41,7 +55,7 @@ const MainView = ({
         </aside>
 
         <main className="main-column">
-            <div className="card">
+            <div className="card card--center-text">
                 <h2 className="card__title">{t.token_selection_title}</h2>
                 <div className="button-group">
                     {Object.keys(TOKENS).map(key => (
@@ -52,7 +66,7 @@ const MainView = ({
                 </div>
             </div>
 
-            <div className="card">
+            <div className="card card--center-text">
                 <h2 className="card__title">{t.donation_type_title}</h2>
                 <div className="button-group">
                     <button className={`button ${donationType === 'custom' ? 'active' : ''}`} onClick={() => setDonationType('custom')}>{t.custom_button}</button>
@@ -95,7 +109,7 @@ const MainView = ({
                     </div>
                 </div>
             ) : (
-                <div className="card">
+                <div className="card card--center-text">
                     <h2 className="card__title">{t.preset_donations_title}</h2>
                     <p className="preset-description">{t.preset_description.replace('{count}', ORGS.length)}</p>
                     <div className="preset-input-container">
@@ -140,10 +154,28 @@ const MainView = ({
             </div>
         </main>
 
-        <aside className="sidebar">
-            <InfoCard title={t.voting_title} content={`${t.voting_link_text} ${t.voting_content}`} />
-            <Plans t={t} />
-            <InfoCard title={t.discussions_title} content={t.discussions_content} />
+        <aside className="sidebar sidebar-right">
+            <CollapsibleCard title={t.voting_title}>
+                <p dangerouslySetInnerHTML={{ __html: `${t.voting_link_text} ${t.voting_content}` }}></p>
+            </CollapsibleCard>
+
+            <CollapsibleCard title={t.plans_title}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.875rem' }}>
+                    <div>
+                        <h3 style={{ fontWeight: '600' }}>{t.plans_section_short_term_title}</h3>
+                        <p dangerouslySetInnerHTML={{ __html: t.plans_section_short_term_text }}></p>
+                    </div>
+                    <div>
+                        <h3 style={{ fontWeight: '600' }}>{t.plans_section_global_title}</h3>
+                        <p dangerouslySetInnerHTML={{ __html: t.plans_section_global_text }}></p>
+                    </div>
+                </div>
+            </CollapsibleCard>
+
+            <CollapsibleCard title={t.discussions_title}>
+                <p dangerouslySetInnerHTML={{ __html: t.discussions_content }}></p>
+            </CollapsibleCard>
+            
             <ContactForm t={t} />
         </aside>
     </div>
@@ -159,6 +191,8 @@ export default function App() {
     const [donationAmounts, setDonationAmounts] = useState(initialAmounts);
     const [presetAmount, setPresetAmount] = useState('0');
     const [status, setStatus] = useState({ message: '', type: 'idle', hash: null });
+    const [activeTxHash, setActiveTxHash] = useState(null);
+    const [transactionStage, setTransactionStage] = useState('idle');
 
     const t = translationData[lang];
     const selectedToken = TOKENS[selectedTokenKey];
@@ -166,7 +200,7 @@ export default function App() {
     const { isConnected, chain } = useAccount();
     const { switchChain } = useSwitchChain();
     const { writeContractAsync } = useWriteContract();
-    const publicClient = usePublicClient(); // New hook for waiting
+    const publicClient = usePublicClient();
 
     const { totalAmount, recipients, amounts } = useMemo(() => {
         if (donationType === 'preset') {
@@ -190,7 +224,6 @@ export default function App() {
     const parsedTotalAmount = parseUnits(totalAmount.toString(), selectedToken.decimals);
     const isButtonDisabled = !isConnected || totalAmount === 0 || status.type === 'pending' || (chain && chain.id !== 137);
 
-    // --- REPLACED TRANSACTION LOGIC ---
     const handleDonateClick = async () => {
         if (isButtonDisabled) return;
         if (chain && chain.id !== 137) {
@@ -199,7 +232,6 @@ export default function App() {
         }
 
         try {
-            // 1. Approve transaction
             setStatus({ message: t.status_approving, type: 'pending', hash: null });
             const approveTxHash = await writeContractAsync({
                 address: selectedToken.address,
@@ -207,46 +239,54 @@ export default function App() {
                 functionName: 'approve',
                 args: [CONTRACT_ADDRESS, parsedTotalAmount],
             });
-
-            // Wait for approve confirmation
-            setStatus({ message: t.status_tx_wait, type: 'pending', hash: approveTxHash });
-            await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
-
-            // 2. Donate transaction
-            setStatus({ message: t.status_sending, type: 'pending', hash: null });
-            const donateArgs = donationType === 'custom'
-                ? { functionName: 'donate', args: [selectedToken.address, recipients, amounts] }
-                : { functionName: 'donatePreset', args: [PRESET_NAME, selectedToken.address, parsedTotalAmount] };
-
-            const donateTxHash = await writeContractAsync({
-                address: CONTRACT_ADDRESS,
-                abi: ABI,
-                ...donateArgs,
-            });
-
-            // Wait for donate confirmation
-            setStatus({ message: t.status_tx_wait, type: 'pending', hash: donateTxHash });
-            await publicClient.waitForTransactionReceipt({ hash: donateTxHash });
-
-            // Success
-            setStatus({ message: t.status_success, type: 'success', hash: donateTxHash });
-            setDonationAmounts(initialAmounts);
-            setPresetAmount('0');
-
-            // Clear status after 8 seconds
-            setTimeout(() => {
-                setStatus({ message: '', type: 'idle', hash: null });
-            }, 8000);
-
+            setActiveTxHash(approveTxHash);
+            setStatus({ message: t.status_tx_wait, type: 'pending', hash: null });
         } catch (error) {
-            console.error("Transaction failed:", error);
-            setStatus({
-                message: `${t.status_error} ${error.shortMessage || error.message}`,
-                type: 'error',
-                hash: null
-            });
+            console.error("Approve transaction error:", error);
+            setStatus({ message: `${t.status_error} ${error.shortMessage || error.message}`, type: 'error', hash: null });
+            setTransactionStage('idle');
         }
     };
+
+    useWaitForTransactionReceipt({ 
+        hash: activeTxHash,
+        onSuccess: (data) => {
+            if (transactionStage === 'approving') {
+                setTransactionStage('donating');
+                setStatus({ message: t.status_sending, type: 'pending', hash: null });
+                
+                const donateArgs = donationType === 'custom'
+                    ? { functionName: 'donate', args: [selectedToken.address, recipients, amounts] }
+                    : { functionName: 'donatePreset', args: [PRESET_NAME, selectedToken.address, parsedTotalAmount] };
+
+                writeContractAsync({
+                    address: CONTRACT_ADDRESS,
+                    abi: ABI,
+                    ...donateArgs,
+                }).then(donateHash => {
+                    setActiveTxHash(donateHash);
+                    setStatus({ message: t.status_tx_wait, type: 'pending', hash: null });
+                }).catch(err => {
+                     setStatus({ message: `${t.status_error} ${err.shortMessage || err.message}`, type: 'error', hash: null });
+                     setTransactionStage('idle');
+                });
+            } else if (transactionStage === 'donating') {
+                setTransactionStage('idle');
+                setStatus({ message: t.status_success, type: 'success', hash: data.transactionHash });
+                setDonationAmounts(initialAmounts);
+                setPresetAmount('0');
+                setTimeout(() => {
+                    setActiveTxHash(null);
+                    setStatus({ message: '', type: 'idle', hash: null });
+                }, 8000);
+            }
+        },
+        onError: (error) => {
+            console.error("Transaction confirmation error:", error);
+            setStatus({ message: `${t.status_error} ${error.shortMessage || error.message}`, type: 'error', hash: null });
+            setTransactionStage('idle');
+        }
+    });
 
     const handleAmountChange = (orgAddress, value) => {
         let sanitizedValue = value.replace(',', '.').replace(/[^0-9.]/g, '');
@@ -278,7 +318,6 @@ export default function App() {
                     setSelectedTokenKey={setSelectedTokenKey}
                     donationType={donationType}
                     setDonationType={setDonationType}
-                    ORGS={ORGS}
                     donationAmounts={donationAmounts}
                     handleAmountChange={handleAmountChange}
                     totalAmount={totalAmount}
