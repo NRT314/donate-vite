@@ -1,10 +1,9 @@
 // src/App.jsx
-import React, { useState, useMemo, useEffect } from 'react';
-import { useAccount, useSwitchChain, useWriteContract, usePublicClient, useWaitForTransactionReceipt } from 'wagmi';
+import React, { useState, useMemo } from 'react';
+import { useAccount, useSwitchChain, useWriteContract, usePublicClient } from 'wagmi';
 import { parseUnits } from 'viem';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 
-// Importing our files and components
 import translationData from './translation.json';
 import { CONTRACT_ADDRESS, TOKENS, ORGS, ABI, ERC20_ABI, initialAmounts, PRESET_NAME } from './constants';
 import './App.css';
@@ -13,14 +12,15 @@ import Footer from './components/Footer';
 import Faq from './components/Faq';
 import ContactForm from './components/ContactForm';
 import ContractDetails from './components/ContractDetails';
-import CollapsibleCard from './components/CollapsibleCard'; // Using the new component
+import CollapsibleCard from './components/CollapsibleCard';
 
 // --- STABLE MAINVIEW COMPONENT ---
-const MainView = ({ 
-    t, setCurrentPage, selectedTokenKey, setSelectedTokenKey, donationType, 
-    setDonationType, donationAmounts, handleAmountChange, totalAmount, 
-    selectedToken, presetAmount, handlePresetAmountChange, isButtonDisabled, 
-    handleDonateClick, status, 
+// This component is defined outside of App to prevent re-renders that cause input fields to lose focus.
+const MainView = ({
+    t, setCurrentPage, selectedTokenKey, setSelectedTokenKey, donationType,
+    setDonationType, donationAmounts, handleAmountChange, totalAmount,
+    selectedToken, presetAmount, handlePresetAmountChange, isButtonDisabled,
+    handleDonateClick, status,
     chain
 }) => (
     <div className="app-grid">
@@ -42,10 +42,10 @@ const MainView = ({
                 </div>
             </CollapsibleCard>
 
-            <div 
-              className="sidebar-card sidebar-link-section"
-              onClick={() => setCurrentPage('contract-details')}
-              style={{cursor: 'pointer'}}
+            <div
+                className="sidebar-card sidebar-link-section"
+                onClick={() => setCurrentPage('contract-details')}
+                style={{cursor: 'pointer'}}
             >
                 <h2 className="sidebar-card__title">
                     {t.how_contract_works_title}
@@ -191,8 +191,6 @@ export default function App() {
     const [donationAmounts, setDonationAmounts] = useState(initialAmounts);
     const [presetAmount, setPresetAmount] = useState('0');
     const [status, setStatus] = useState({ message: '', type: 'idle', hash: null });
-    const [activeTxHash, setActiveTxHash] = useState(null);
-    const [transactionStage, setTransactionStage] = useState('idle');
 
     const t = translationData[lang];
     const selectedToken = TOKENS[selectedTokenKey];
@@ -215,15 +213,16 @@ export default function App() {
             if (amount > 0) {
                 total += amount;
                 rec.push(orgAddress);
-                amnts.push(parseUnits(donationAmounts[orgAddress], selectedToken.decimals));
+                amnts.push(parseUnits(String(donationAmounts[orgAddress]), selectedToken.decimals));
             }
         }
         return { totalAmount: total, recipients: rec, amounts: amnts };
     }, [donationAmounts, presetAmount, donationType, selectedToken.decimals]);
 
-    const parsedTotalAmount = parseUnits(totalAmount.toString(), selectedToken.decimals);
+    const parsedTotalAmount = parseUnits(String(totalAmount), selectedToken.decimals);
     const isButtonDisabled = !isConnected || totalAmount === 0 || status.type === 'pending' || (chain && chain.id !== 137);
 
+    // 🔹 Новый donate flow — полностью линейный
     const handleDonateClick = async () => {
         if (isButtonDisabled) return;
         if (chain && chain.id !== 137) {
@@ -232,61 +231,47 @@ export default function App() {
         }
 
         try {
+            // 1. Approve
             setStatus({ message: t.status_approving, type: 'pending', hash: null });
-            const approveTxHash = await writeContractAsync({
+            const approveHash = await writeContractAsync({
                 address: selectedToken.address,
                 abi: ERC20_ABI,
                 functionName: 'approve',
                 args: [CONTRACT_ADDRESS, parsedTotalAmount],
             });
-            setActiveTxHash(approveTxHash);
-            setStatus({ message: t.status_tx_wait, type: 'pending', hash: null });
+
+            await publicClient.waitForTransactionReceipt({ hash: approveHash });
+
+            // 2. Donate
+            setStatus({ message: t.status_sending, type: 'pending', hash: null });
+
+            const donateArgs = donationType === 'custom'
+                ? { functionName: 'donate', args: [selectedToken.address, recipients, amounts] }
+                : { functionName: 'donatePreset', args: [PRESET_NAME, selectedToken.address, parsedTotalAmount] };
+
+            const donateHash = await writeContractAsync({
+                address: CONTRACT_ADDRESS,
+                abi: ABI,
+                ...donateArgs,
+            });
+
+            await publicClient.waitForTransactionReceipt({ hash: donateHash });
+
+            // 3. Success
+            setStatus({ message: t.status_success, type: 'success', hash: donateHash });
+            setDonationAmounts(initialAmounts);
+            setPresetAmount('0');
+
+            // Сбрасываем сообщение через 8 секунд
+            setTimeout(() => {
+                setStatus({ message: '', type: 'idle', hash: null });
+            }, 8000);
+
         } catch (error) {
-            console.error("Approve transaction error:", error);
+            console.error("Donate flow error:", error);
             setStatus({ message: `${t.status_error} ${error.shortMessage || error.message}`, type: 'error', hash: null });
-            setTransactionStage('idle');
         }
     };
-
-    useWaitForTransactionReceipt({ 
-        hash: activeTxHash,
-        onSuccess: (data) => {
-            if (transactionStage === 'approving') {
-                setTransactionStage('donating');
-                setStatus({ message: t.status_sending, type: 'pending', hash: null });
-                
-                const donateArgs = donationType === 'custom'
-                    ? { functionName: 'donate', args: [selectedToken.address, recipients, amounts] }
-                    : { functionName: 'donatePreset', args: [PRESET_NAME, selectedToken.address, parsedTotalAmount] };
-
-                writeContractAsync({
-                    address: CONTRACT_ADDRESS,
-                    abi: ABI,
-                    ...donateArgs,
-                }).then(donateHash => {
-                    setActiveTxHash(donateHash);
-                    setStatus({ message: t.status_tx_wait, type: 'pending', hash: null });
-                }).catch(err => {
-                     setStatus({ message: `${t.status_error} ${err.shortMessage || err.message}`, type: 'error', hash: null });
-                     setTransactionStage('idle');
-                });
-            } else if (transactionStage === 'donating') {
-                setTransactionStage('idle');
-                setStatus({ message: t.status_success, type: 'success', hash: data.transactionHash });
-                setDonationAmounts(initialAmounts);
-                setPresetAmount('0');
-                setTimeout(() => {
-                    setActiveTxHash(null);
-                    setStatus({ message: '', type: 'idle', hash: null });
-                }, 8000);
-            }
-        },
-        onError: (error) => {
-            console.error("Transaction confirmation error:", error);
-            setStatus({ message: `${t.status_error} ${error.shortMessage || error.message}`, type: 'error', hash: null });
-            setTransactionStage('idle');
-        }
-    });
 
     const handleAmountChange = (orgAddress, value) => {
         let sanitizedValue = value.replace(',', '.').replace(/[^0-9.]/g, '');
