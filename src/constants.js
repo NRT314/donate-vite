@@ -12,6 +12,11 @@ export const TOKENS = {
     usdc: {
         address: "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174",
         decimals: 6,
+        symbol: "USDC.e"
+    },
+    usdc_native: {
+        address: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+        decimals: 6,
         symbol: "USDC"
     },
     dai: {
@@ -61,7 +66,8 @@ export const ERC20_ABI = [
 ];
 
 export const ORGS = [
-    { key: "thisproject", address: "0xc0F467567570AADa929fFA115E65bB39066e3E42", link: "https://nrt314.github.io/donate-site" },
+    // Ссылка изменена
+    { key: "thisproject", address: "0xc0F467567570AADa929fFA115E65bB39066e3E42", link: "https://newrussia.online/" },
     { key: "ovdinfo", address: "0x421896bb0Dcf271a294bC7019014EE90503656Fd", link: "https://ovd.info" },
     { key: "mediazona", address: "0xE86D7D922DeF8a8FEB21f1702C9AaEEDBec32DDC", link: "https://zona.media" },
     { key: "zhuk", address: "0x1913A02BB3836AF224aEF136461F43189A0cEcd0", link: "https://www.zhuk.world/" },
@@ -76,7 +82,11 @@ export const ORGS = [
     { key: "iditelesom", address: "0x387C5300586336d145A87C245DD30f9724C6eC01", link: "https://iditelesom.org/ru" },
     { key: "memorial", address: "0x0a4aB5D641f63cd7a2d44d0a643424f5d0df376b", link: "https://memopzk.org/" },
     { key: "insider", address: "0xad8221D4A4feb023156b9E09917Baa4ff81A65F8", link: "https://theins.ru" },
-    { key: "rain", address: "0x552dAfED221689e44676477881B6947074a5C342", link: "https://tvrain.tv/" }
+    { key: "rain", address: "0x552dAfED221689e44676477881B6947074a5C342", link: "https://tvrain.tv/" },
+    { key: "novayagazeta", address: "0x56F2EbC2660c2f545316fe305FDF06d84Fa9ef61", link: "https://novayagazeta.eu/" },
+    { key: "rabkor", address: "0xc759F945313fd2694F46f73756d48150A271EABB", link: "https://www.youtube.com/@Rabkor" },
+    { key: "mostmedia", address: "0x3Dd2d15b200C05c33CC308bfa9B856c9704F7472", link: "https://mostmedia.org" },
+    { key: "paper", address: "0x5f38083dDdCd48F729B5FA41B9380CdA068973b0", link: "https://paperpaper.io/" }
 ];
 
 export const initialAmounts = ORGS.reduce((acc, org) => {

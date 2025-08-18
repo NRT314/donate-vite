@@ -97,7 +97,28 @@
         "security_li3_strong": "Safe Token Transfers:",
         "security_li3_text": "The `safeTransferCompatible` and `safeTransferFromCompatible` functions correctly handle ERC20 token transfers, including those that do not return a boolean (like USDT)."
     },
-    "org_names": { "thisproject": "NRT project", "ovdinfo": "OVD-Info", "mediazona": "Mediazona", "zhuk": "Zhuk", "breakfastshow": "Breakfast Show", "kovcheg": "Kovcheg (ark)", "findexit": "Ishemvihod", "gulagunet": "Gulagu.net", "meduza": "Meduza", "cit": "Conflict Intelligence Team", "importantstories": "Important Stories", "fbk": "FBK", "iditelesom": "Iditelesom", "memorial": "Memorial", "insider": "Insider", "rain": "Rain" }
+    "org_names": {
+        "thisproject": "NRT project",
+        "ovdinfo": "OVD-Info",
+        "mediazona": "Mediazona",
+        "zhuk": "Zhuk",
+        "breakfastshow": "Breakfast Show",
+        "kovcheg": "Kovcheg (ark)",
+        "findexit": "Ishemvihod",
+        "gulagunet": "Gulagu.net",
+        "meduza": "Meduza",
+        "cit": "Conflict Intelligence Team",
+        "importantstories": "Important Stories",
+        "fbk": "FBK",
+        "iditelesom": "Iditelesom",
+        "memorial": "Memorial",
+        "insider": "Insider",
+        "rain": "Rain",
+        "novayagazeta": "Novaya Gazeta Europe",
+        "rabkor": "RabKor",
+        "mostmedia": "Most.media",
+        "paper": "Paper"
+    }
   },
   "ru": {
     "meta_description": "NRT - блокчейн-платформа для прозрачной и безопасной поддержки независимых организаций с помощью криптопожертвований.",
@@ -197,6 +218,27 @@
         "security_li3_strong": "Безопасные переводы токенов:",
         "security_li3_text": "Функции safeTransferCompatible и safeTransferFromCompatible корректно обрабатывают переводы токенов ERC20, в том числе тех, которые не возвращают bool (как, например, USDT)."
     },
-    "org_names": { "thisproject": "Проект NRT", "ovdinfo": "ОВД-Инфо", "mediazona": "Медиазона", "zhuk": "Вывожук", "breakfastshow": "Breakfast Show", "kovcheg": "Ковчег", "findexit": "Ищем Выход", "gulagunet": "Гулагу - нет", "meduza": "Медуза", "cit": "Conflict Intelligence Team", "importantstories": "Важные истории", "fbk": "ФБК", "iditelesom": "Идите лесом", "memorial": "Мемориал", "insider": "Insider", "rain": "Дождь" }
+    "org_names": {
+        "thisproject": "Проект NRT",
+        "ovdinfo": "ОВД-Инфо",
+        "mediazona": "Медиазона",
+        "zhuk": "Вывожук",
+        "breakfastshow": "Breakfast Show",
+        "kovcheg": "Ковчег",
+        "findexit": "Ищем Выход",
+        "gulagunet": "Гулагу - нет",
+        "meduza": "Медуза",
+        "cit": "Conflict Intelligence Team",
+        "importantstories": "Важные истории",
+        "fbk": "ФБК",
+        "iditelesom": "Идите лесом",
+        "memorial": "Мемориал",
+        "insider": "Insider",
+        "rain": "Дождь",
+        "novayagazeta": "Новая Газета Европа",
+        "rabkor": "РабКор",
+        "mostmedia": "Мост.медиа",
+        "paper": "Бумага"
+    }
   }
 }
