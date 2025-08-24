@@ -1,28 +1,24 @@
 // src/App.jsx
 import React, { useState, useMemo } from 'react';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { useAccount, useSwitchChain, useWriteContract, usePublicClient } from 'wagmi';
 import { parseUnits } from 'viem';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 import translationData from './translation.json';
 import { CONTRACT_ADDRESS, TOKENS, ORGS, ABI, ERC20_ABI, initialAmounts, PRESET_NAME } from './constants';
 import './App.css';
+
 import Header from './components/Header';
 import Footer from './components/Footer';
 import Faq from './components/Faq';
 import ContactForm from './components/ContactForm';
 import ContractDetails from './components/ContractDetails';
 import CollapsibleCard from './components/CollapsibleCard';
+import VotingPage from './pages/VotingPage';
+import ProposalView from './pages/ProposalView';
 
-// --- STABLE MAINVIEW COMPONENT ---
-// This component is defined outside of App to prevent re-renders that cause input fields to lose focus.
-const MainView = ({
-    t, setCurrentPage, selectedTokenKey, setSelectedTokenKey, donationType,
-    setDonationType, donationAmounts, handleAmountChange, totalAmount,
-    selectedToken, presetAmount, handlePresetAmountChange, isButtonDisabled,
-    handleDonateClick, status,
-    chain
-}) => (
+// --- MAINVIEW COMPONENT ---
+const MainView = ({ t, navigate, ...props }) => (
     <div className="app-grid">
         <aside className="sidebar sidebar-left">
             <CollapsibleCard title={t.about_title}>
@@ -41,47 +37,42 @@ const MainView = ({
                     </div>
                 </div>
             </CollapsibleCard>
-
             <div
                 className="sidebar-card sidebar-link-section"
-                onClick={() => setCurrentPage('contract-details')}
+                onClick={() => navigate('/contract-details')}
                 style={{cursor: 'pointer'}}
             >
-                <h2 className="sidebar-card__title">
-                    {t.how_contract_works_title}
-                </h2>
+                <h2 className="sidebar-card__title">{t.how_contract_works_title}</h2>
             </div>
             <Faq t={t} />
         </aside>
-
         <main className="main-column">
+             {/* ... (содержимое main-column остается без изменений) ... */}
             <div className="card card--center-text">
                 <h2 className="card__title">{t.token_selection_title}</h2>
                 <div className="button-group">
                     {Object.keys(TOKENS).map(key => (
-                        <button key={key} className={`button ${selectedTokenKey === key ? 'active' : ''}`} onClick={() => setSelectedTokenKey(key)}>
+                        <button key={key} className={`button ${props.selectedTokenKey === key ? 'active' : ''}`} onClick={() => props.setSelectedTokenKey(key)}>
                             {TOKENS[key].symbol}
                         </button>
                     ))}
                 </div>
             </div>
-
             <div className="card card--center-text">
                 <h2 className="card__title">{t.donation_type_title}</h2>
                 <div className="button-group">
-                    <button className={`button ${donationType === 'custom' ? 'active' : ''}`} onClick={() => setDonationType('custom')}>{t.custom_button}</button>
-                    <button className={`button ${donationType === 'preset' ? 'active' : ''}`} onClick={() => setDonationType('preset')}>{t.preset_button}</button>
+                    <button className={`button ${props.donationType === 'custom' ? 'active' : ''}`} onClick={() => props.setDonationType('custom')}>{t.custom_button}</button>
+                    <button className={`button ${props.donationType === 'preset' ? 'active' : ''}`} onClick={() => props.setDonationType('preset')}>{t.preset_button}</button>
                 </div>
             </div>
-            
-            {donationType === 'custom' ? (
+            {props.donationType === 'custom' ? (
                 <div className="card">
                     <h2 className="card__title">{t.donations_title}</h2>
                     <table className="donation-table">
                         <thead>
                             <tr>
                                 <th>{t.org_header}</th>
-                                <th>{t.amount_header} ({selectedToken.symbol})</th>
+                                <th>{t.amount_header} ({props.selectedToken.symbol})</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -89,15 +80,7 @@ const MainView = ({
                                 <tr key={org.address}>
                                     <td><a href={org.link} target="_blank" rel="noopener noreferrer">{t.org_names[org.key]}</a></td>
                                     <td>
-                                        <input
-                                            type="text"
-                                            inputMode="decimal"
-                                            value={donationAmounts[org.address]}
-                                            onChange={e => handleAmountChange(org.address, e.target.value)}
-                                            placeholder="0.00"
-                                            className="amount-input"
-                                            disabled={status.type === 'pending'}
-                                        />
+                                        <input type="text" inputMode="decimal" value={props.donationAmounts[org.address]} onChange={e => props.handleAmountChange(org.address, e.target.value)} placeholder="0.00" className="amount-input" disabled={props.status.type === 'pending'} />
                                     </td>
                                 </tr>
                             ))}
@@ -105,7 +88,7 @@ const MainView = ({
                     </table>
                     <div className="total-row">
                         <span>{t.total_amount_text}</span>
-                        <span>{totalAmount.toFixed(2)} {selectedToken.symbol}</span>
+                        <span>{props.totalAmount.toFixed(2)} {props.selectedToken.symbol}</span>
                     </div>
                 </div>
             ) : (
@@ -113,51 +96,42 @@ const MainView = ({
                     <h2 className="card__title">{t.preset_donations_title}</h2>
                     <p className="preset-description">{t.preset_description.replace('{count}', ORGS.length)}</p>
                     <div className="preset-input-container">
-                            <input
-                            type="text"
-                            inputMode="decimal"
-                            value={presetAmount}
-                            onChange={e => handlePresetAmountChange(e.target.value)}
-                            placeholder="0.00"
-                            className="amount-input preset-input"
-                            disabled={status.type === 'pending'}
-                        />
-                        <span className="token-symbol">{selectedToken.symbol}</span>
+                        <input type="text" inputMode="decimal" value={props.presetAmount} onChange={e => props.handlePresetAmountChange(e.target.value)} placeholder="0.00" className="amount-input preset-input" disabled={props.status.type === 'pending'} />
+                        <span className="token-symbol">{props.selectedToken.symbol}</span>
                     </div>
                 </div>
             )}
-            
             <div className="card card--center-text">
                 <h2 className="card__title">{t.nrt_title}</h2>
                 <p style={{fontSize: '1.2rem', fontWeight: 'bold', color: '#4b5563'}}>
-                    <span style={{fontSize: '1.5rem', fontWeight: '800', color: '#2563eb'}}>{totalAmount.toFixed(2)}</span> NRT
+                    <span style={{fontSize: '1.5rem', fontWeight: '800', color: '#2563eb'}}>{props.totalAmount.toFixed(2)}</span> NRT
                 </p>
             </div>
-
             <div className="action-section">
-                <button
-                    className="button button--primary"
-                    onClick={handleDonateClick}
-                    disabled={isButtonDisabled}
-                >
-                    {chain && chain.id !== 137 ? t.switch_to_polygon : t.donate_button}
+                <button className="button button--primary" onClick={props.handleDonateClick} disabled={props.isButtonDisabled}>
+                    {props.chain && props.chain.id !== 137 ? t.switch_to_polygon : t.donate_button}
                 </button>
-                {status.message && (
+                {props.status.message && (
                     <div className="status-message">
-                        <p>{status.message}</p>
-                        {status.type === 'pending' && <div className="spinner"></div>}
-                        {status.type === 'success' && status.hash && (
-                            <a href={`https://polygonscan.com/tx/${status.hash}`} target="_blank" rel="noopener noreferrer">View on Polygonscan</a>
+                        <p>{props.status.message}</p>
+                        {props.status.type === 'pending' && <div className="spinner"></div>}
+                        {props.status.type === 'success' && props.status.hash && (
+                            <a href={`https://polygonscan.com/tx/${props.status.hash}`} target="_blank" rel="noopener noreferrer">View on Polygonscan</a>
                         )}
                     </div>
                 )}
             </div>
         </main>
-
         <aside className="sidebar sidebar-right">
-            <CollapsibleCard title={t.voting_title}>
-                <p dangerouslySetInnerHTML={{ __html: `${t.voting_link_text} ${t.voting_content}` }}></p>
-            </CollapsibleCard>
+            {/* 👇 ИЗМЕНЕНИЕ: Старый блок голосования заменен на новый */}
+            <div
+                className="sidebar-card sidebar-link-section"
+                onClick={() => navigate('/voting')}
+                style={{cursor: 'pointer'}}
+            >
+                <h2 className="sidebar-card__title">{t.use_nrt_for_voting}</h2>
+            </div>
+            {/* 👆 КОНЕЦ ИЗМЕНЕНИЯ */}
 
             <CollapsibleCard title={t.plans_title}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.875rem' }}>
@@ -171,11 +145,9 @@ const MainView = ({
                     </div>
                 </div>
             </CollapsibleCard>
-
             <CollapsibleCard title={t.discussions_title}>
                 <p dangerouslySetInnerHTML={{ __html: t.discussions_content }}></p>
             </CollapsibleCard>
-            
             <ContactForm t={t} />
         </aside>
     </div>
@@ -183,8 +155,8 @@ const MainView = ({
 
 
 // --- MAIN APP COMPONENT ---
+// (Этот компонент остается без изменений)
 export default function App() {
-    const [currentPage, setCurrentPage] = useState('main');
     const [lang, setLang] = useState('en');
     const [donationType, setDonationType] = useState('custom');
     const [selectedTokenKey, setSelectedTokenKey] = useState('usdt');
@@ -193,6 +165,7 @@ export default function App() {
     const [status, setStatus] = useState({ message: '', type: 'idle', hash: null });
 
     const t = translationData[lang];
+    const navigate = useNavigate();
     const selectedToken = TOKENS[selectedTokenKey];
     
     const { isConnected, chain } = useAccount();
@@ -222,7 +195,6 @@ export default function App() {
     const parsedTotalAmount = parseUnits(String(totalAmount), selectedToken.decimals);
     const isButtonDisabled = !isConnected || totalAmount === 0 || status.type === 'pending' || (chain && chain.id !== 137);
 
-    // 🔹 Новый donate flow — полностью линейный
     const handleDonateClick = async () => {
         if (isButtonDisabled) return;
         if (chain && chain.id !== 137) {
@@ -231,7 +203,6 @@ export default function App() {
         }
 
         try {
-            // 1. Approve
             setStatus({ message: t.status_approving, type: 'pending', hash: null });
             const approveHash = await writeContractAsync({
                 address: selectedToken.address,
@@ -239,34 +210,25 @@ export default function App() {
                 functionName: 'approve',
                 args: [CONTRACT_ADDRESS, parsedTotalAmount],
             });
-
             await publicClient.waitForTransactionReceipt({ hash: approveHash });
 
-            // 2. Donate
             setStatus({ message: t.status_sending, type: 'pending', hash: null });
-
             const donateArgs = donationType === 'custom'
                 ? { functionName: 'donate', args: [selectedToken.address, recipients, amounts] }
                 : { functionName: 'donatePreset', args: [PRESET_NAME, selectedToken.address, parsedTotalAmount] };
-
             const donateHash = await writeContractAsync({
                 address: CONTRACT_ADDRESS,
                 abi: ABI,
                 ...donateArgs,
             });
-
             await publicClient.waitForTransactionReceipt({ hash: donateHash });
 
-            // 3. Success
             setStatus({ message: t.status_success, type: 'success', hash: donateHash });
             setDonationAmounts(initialAmounts);
             setPresetAmount('0');
-
-            // Сбрасываем сообщение через 8 секунд
             setTimeout(() => {
                 setStatus({ message: '', type: 'idle', hash: null });
             }, 8000);
-
         } catch (error) {
             console.error("Donate flow error:", error);
             setStatus({ message: `${t.status_error} ${error.shortMessage || error.message}`, type: 'error', hash: null });
@@ -295,28 +257,43 @@ export default function App() {
         <div className="app-container">
             <Header t={t} lang={lang} setLang={setLang} />
             
-            {currentPage === 'main' ? (
-                <MainView 
-                    t={t}
-                    setCurrentPage={setCurrentPage}
-                    selectedTokenKey={selectedTokenKey}
-                    setSelectedTokenKey={setSelectedTokenKey}
-                    donationType={donationType}
-                    setDonationType={setDonationType}
-                    donationAmounts={donationAmounts}
-                    handleAmountChange={handleAmountChange}
-                    totalAmount={totalAmount}
-                    selectedToken={selectedToken}
-                    presetAmount={presetAmount}
-                    handlePresetAmountChange={handlePresetAmountChange}
-                    isButtonDisabled={isButtonDisabled}
-                    handleDonateClick={handleDonateClick}
-                    status={status}
-                    chain={chain}
+            <Routes>
+                <Route 
+                    path="/" 
+                    element={
+                        <MainView 
+                            t={t}
+                            navigate={navigate}
+                            selectedTokenKey={selectedTokenKey}
+                            setSelectedTokenKey={setSelectedTokenKey}
+                            donationType={donationType}
+                            setDonationType={setDonationType}
+                            donationAmounts={donationAmounts}
+                            handleAmountChange={handleAmountChange}
+                            totalAmount={totalAmount}
+                            selectedToken={selectedToken}
+                            presetAmount={presetAmount}
+                            handlePresetAmountChange={handlePresetAmountChange}
+                            isButtonDisabled={isButtonDisabled}
+                            handleDonateClick={handleDonateClick}
+                            status={status}
+                            chain={chain}
+                        />
+                    } 
                 />
-            ) : (
-                <ContractDetails t={t} onBack={() => setCurrentPage('main')} />
-            )}
+                <Route 
+                    path="/voting" 
+                    element={<VotingPage t={t} onBack={() => navigate('/')} />} 
+                />
+                <Route 
+                    path="/voting/:proposalId" 
+                    element={<ProposalView t={t} />} 
+                />
+                <Route 
+                    path="/contract-details" 
+                    element={<ContractDetails t={t} onBack={() => navigate('/')} />} 
+                />
+            </Routes>
 
             <Footer t={t} />
         </div>

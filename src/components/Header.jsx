@@ -1,5 +1,6 @@
 // src/components/Header.jsx
 import { ConnectButton } from '@rainbow-me/rainbowkit';
+import NrtBalance from './NrtBalance';
 
 export default function Header({ t, lang, setLang }) {
   return (
@@ -11,14 +12,23 @@ export default function Header({ t, lang, setLang }) {
           <h1 className="header-title">{t.title}</h1>
         </div>
         
-        {/* Правая группа, которая на ПК будет позиционироваться абсолютно */}
-        <div className="header-right-group">
-          <div className="header-lang-switcher">
-            <button onClick={() => setLang('en')} className={`lang-btn ${lang === 'en' ? 'active' : ''}`}>EN</button>
-            <button onClick={() => setLang('ru')} className={`lang-btn ${lang === 'ru' ? 'active' : ''}`}>RU</button>
+        {/* 👇 1. Создаем новый общий контейнер для кошелька и баланса */}
+        <div className="wallet-info-wrapper">
+          {/* Правая группа, которая на ПК будет позиционироваться абсолютно */}
+          <div className="header-right-group">
+            <div className="header-lang-switcher">
+              <button onClick={() => setLang('en')} className={`lang-btn ${lang === 'en' ? 'active' : ''}`}>EN</button>
+              <button onClick={() => setLang('ru')} className={`lang-btn ${lang === 'ru' ? 'active' : ''}`}>RU</button>
+            </div>
+            
+            {/* 👇 2. Убираем баланс из этой строки, возвращая ее к исходному виду */}
+            <ConnectButton />
           </div>
-          <ConnectButton />
+
+          {/* 👇 3. Размещаем баланс здесь, под основной группой кнопок */}
+          <NrtBalance t={t} /> 
         </div>
+
       </div>
       
       {/* Текст под шапкой */}

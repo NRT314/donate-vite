@@ -1,3 +1,4 @@
+// src/components/Plans.jsx
 export default function Plans({ t }) {
   return (
     <section className="sidebar-card">
