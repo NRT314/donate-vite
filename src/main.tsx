@@ -27,11 +27,10 @@ const config = getDefaultConfig({
 
 const queryClient = new QueryClient();
 
-const basename = import.meta.env.PROD ? "/donate-vite/" : "/";
-
+// 👇 ИЗМЕНЕНИЕ: Старая логика с basename удалена
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter basename={basename}>
+    <BrowserRouter> {/* <--- basename убран отсюда */}
       <WagmiProvider config={config}>
         <QueryClientProvider client={queryClient}>
           <RainbowKitProvider>
