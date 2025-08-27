@@ -28,16 +28,16 @@ export default function ContactForm({ t }) {
 
   return (
     <section className="sidebar-card">
-      <h2 className="sidebar-card__title">{t.contact_title}</h2>
+      <h2 className="sidebar-card__title">{t.contact_form_title}</h2>
       <form
         action="https://formspree.io/f/xrblykve"
         method="POST"
         onSubmit={handleSubmit}
         className="contact-form"
       >
-        <input type="email" name="_replyto" placeholder="Email" className="form-input" />
-        <textarea name="message" rows="3" placeholder="Message" className="form-textarea" required></textarea>
-        <button type="submit" className="form-button">Send</button>
+        <input type="email" name="_replyto" placeholder={t.contact_form_email_placeholder} className="form-input" />
+        <textarea name="message" rows="3" placeholder={t.contact_form_message_placeholder} className="form-textarea" required></textarea>
+        <button type="submit" className="form-button">{t.contact_form_send_button}</button>
         {status && <p className="form-status">{status}</p>}
       </form>
     </section>
