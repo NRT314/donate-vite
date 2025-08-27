@@ -13,7 +13,7 @@ import {
 import {
   WagmiProvider,
   http,
-  createConfig,
+  // createConfig, // <--- Удалено
 } from 'wagmi';
 import { polygon } from 'wagmi/chains';
 import {
