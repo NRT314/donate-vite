@@ -5,7 +5,8 @@ export const CONTRACT_ADDRESS = "0xE61FEb2c3278A6094571ce12177767221cA4b661";
 export const PRESET_NAME = "equal";
 
 // --- VOTING SYSTEM ADDRESSES ---
-export const VOTING_CONTRACT_ADDRESS = "0x44b826DCB5F585A4A7eca2fEc645efC711BFa83f";
+// ИЗМЕНЕНО: Обновлен адрес задеплоенного контракта
+export const VOTING_CONTRACT_ADDRESS = "0x2bF959481E1b9f0989274c38bd417669cE557aFc";
 export const NRT_VOTING_TOKEN_ADDRESS = "0xE61FEb2c3278A6094571ce12177767221cA4b661"; // This is the real NRT token
 export const FORWARDER_ADDRESS = "0xDd65a28DE55c4328Ebd3aED01d6B4779335694AE";
 
@@ -1742,6 +1743,25 @@ export const VOTING_ABI = [
   },
   {
     "type": "function",
+    "name": "getVoterCount",
+    "inputs": [
+      {
+        "name": "proposalId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "hasVoted",
     "inputs": [
       {
@@ -2236,7 +2256,7 @@ export const ERC20_ABI = [
 export const ORGS = [
     { key: "thisproject", address: "0xc0F467567570AADa929fFA115E65bB39066e3E42", link: "https://newrussia.online/" },
     { key: "ovdinfo", address: "0x421896bb0Dcf271a294bC7019014EE90503656Fd", link: "https://ovd.info" },
-    { key: "mediazona", address: "0xE86D7D922DeF8a8FEB21f1702C9AaEEDBec32DDC", link: "https://zona.media" },
+    { key: "mediazona", address: "0xE86D7D922DeF8a8FEB21f1702Cfb55b98d193B94C0fa", link: "https://zona.media" },
     { key: "zhuk", address: "0x1913A02BB3836AF224aEF136461F43189A0cEcd0", link: "https://www.zhuk.world/" },
     { key: "breakfastshow", address: "0xdB4BB555a15bC8bB3b07E57452a8E6E24b358e7F", link: "https://www.youtube.com/@The_Breakfast_Show" },
     { key: "kovcheg", address: "0xBf178F99b8790db1BD2194D80c3a268AE4AcE804", link: "https://kovcheg.live" },

@@ -9,6 +9,30 @@ export default function ContractDetails({ t, onBack }) {
         <p>{pageContent.intro_p1}</p>
         <p>{pageContent.intro_p2}</p>
 
+        {/* --- БЛОК С ССЫЛКОЙ НА WHITEPAPER --- */}
+        <div style={{
+          margin: '2rem 0',
+          padding: '1rem',
+          backgroundColor: '#f9fafb',
+          border: '1px solid #e5e7eb',
+          borderRadius: '8px',
+          textAlign: 'center'
+        }}>
+          <a
+            href="/whitepaper.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              color: '#1d4ed8',
+              fontWeight: '600',
+              textDecoration: 'underline'
+            }}
+          >
+            📄 WhitePaper
+          </a>
+        </div>
+        {/* ------------------------------------ */}
+
         <h2>{pageContent.core_components_title}</h2>
 
         <h3>{pageContent.nrt_token_title}</h3>

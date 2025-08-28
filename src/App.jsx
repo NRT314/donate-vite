@@ -40,10 +40,10 @@ const MainView = ({ t, lang, navigate, ...props }) => {
     if (isLoadingTotal) {
         totalDisplayContent = t.loading_text;
     } else if (isError || totalDonated === undefined) {
-        totalDisplayContent = '$0.00 USDT';
+        totalDisplayContent = '$0.00 USD';
     } else {
         const formattedAmount = parseFloat(formatUnits(totalDonated, 6)).toFixed(2);
-        totalDisplayContent = `$${formattedAmount} USDT`;
+        totalDisplayContent = `$${formattedAmount} USD`;
     }
 
     return (

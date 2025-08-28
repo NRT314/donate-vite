@@ -88,6 +88,17 @@ export default function ProposalView({ t }) {
     enabled: !!proposalId,
   });
 
+  // --- НОВЫЙ КОД: Получение количества проголосовавших ---
+  const { data: voterCount, isLoading: isLoadingVoterCount } = useReadContract({
+    address: VOTING_CONTRACT_ADDRESS,
+    abi: VOTING_ABI,
+    functionName: 'getVoterCount',
+    args: [proposalId],
+    enabled: !!proposalId,
+    watch: true, // Автоматическое обновление данных в реальном времени
+  });
+  // --- КОНЕЦ НОВОГО КОДА ---
+
   const {
     base: proposal,
     scores,
@@ -149,7 +160,6 @@ export default function ProposalView({ t }) {
             data: encodedData,
         };
 
-        // --- ✅ ДОБАВЛЕННЫЙ БЛОК ДЛЯ ФИНАЛЬНОЙ ПРОВЕРКИ ---
         const dataToSign = {
             domain: { ...EIP712_DOMAIN, chainId: chain.id, verifyingContract: FORWARDER_ADDRESS },
             types: FORWARD_REQUEST_TYPES,
@@ -157,9 +167,8 @@ export default function ProposalView({ t }) {
             message: request
         };
         console.log("Final data packet for signing:", dataToSign);
-        // --- КОНЕЦ БЛОКА ПРОВЕРКИ ---
 
-        const signature = await signTypedDataAsync(dataToSign); // Используем dataToSign здесь
+        const signature = await signTypedDataAsync(dataToSign);
 
         setStatus({ message: t.status_relaying || 'Отправка голоса через релеер...', type: 'pending' });
         
@@ -177,7 +186,6 @@ export default function ProposalView({ t }) {
         const result = await response.json();
 
         if (result.success) {
-            // --- ✅ FIX: Check if txHash exists before using it ---
             let successMessage = t.status_vote_relayed || '✅ Vote sent successfully!';
             if (result.txHash) {
                 successMessage = `${t.status_vote_relayed || '✅ Vote sent! Hash:'} ${result.txHash.slice(0, 10)}...`;
@@ -246,6 +254,18 @@ export default function ProposalView({ t }) {
         )}
 
         <CountdownTimer endTime={Number(proposal.endTime)} t={t} />
+
+        {/* --- НОВЫЙ КОД: Отображение количества проголосовавших --- */}
+        <div className="voter-count-section" style={{ margin: '1rem 0' }}>
+            {isLoadingVoterCount ? (
+                <span>{t.loading_voters || "Loading voter count..."}</span>
+            ) : (
+                <span style={{ fontWeight: 'bold' }}>
+                    {t.total_voters || "Total Voters:"} {voterCount?.toString() || 0}
+                </span>
+            )}
+        </div>
+        {/* --- КОНЕЦ НОВОГО КОДА --- */}
         
         <div className="results-section" style={{ marginBottom: '2rem' }}>
           <h3>{t.current_results || "Current Results:"}</h3>
