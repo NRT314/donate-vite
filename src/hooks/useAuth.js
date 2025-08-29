@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useAccount, useSignMessage } from 'wagmi';
 
-const API_URL = 'http://localhost:3001'; // URL вашего бэкенда
+const API_URL = import.meta.env.VITE_API_URL;
 
 export const useAuth = () => {
     const [isLoading, setIsLoading] = useState(false);
