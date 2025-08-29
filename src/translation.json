@@ -167,7 +167,11 @@
     "how_to_buy_crypto_title": "How to safely buy crypto",
     "how_to_buy_crypto_content": "The guide will be available here soon.",
     "proposal_vote_button": "Vote",
-    "you_have_voted": "You have already voted in this proposal."
+    "you_have_voted": "You have already voted in this proposal.",
+    "forum_modal_title": "Forum Access",
+    "forum_modal_description": "How would you like to proceed?",
+    "forum_login_button": "Login with Wallet",
+    "forum_anonymous_button": "Continue Anonymously"
   },
   "ru": {
     "meta_description": "NRT - блокчейн-платформа для прозрачной и безопасной поддержки независимых организаций с помощью криптопожертвований.",
@@ -337,6 +341,10 @@
     "how_to_buy_crypto_title": "Как безопасно купить крипту",
     "how_to_buy_crypto_content": "Инструкция скоро появится здесь.",
     "proposal_vote_button": "Проголосовать",
-    "you_have_voted": "Вы уже проголосовали в этом предложении."
+    "you_have_voted": "Вы уже проголосовали в этом предложении.",
+    "forum_modal_title": "Доступ к форуму",
+    "forum_modal_description": "Как вы хотите продолжить?",
+    "forum_login_button": "Войти с помощью кошелька",
+    "forum_anonymous_button": "Продолжить анонимно"
   }
 }

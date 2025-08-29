@@ -20,6 +20,8 @@ import CollapsibleCard from './components/CollapsibleCard';
 import VotingPage from './pages/VotingPage';
 import ProposalView from './pages/ProposalView';
 import AdminPage from './pages/AdminPage';
+import { useAuth } from './hooks/useAuth'; 
+import ForumLoginModal from './components/ForumLoginModal'; 
 
 const initialAmounts = ORGANIZATIONS.reduce((acc, org) => {
     acc[org.address] = '';
@@ -167,7 +169,7 @@ const MainView = ({ t, lang, navigate, ...props }) => {
 
                 <div
                     className="sidebar-card sidebar-link-section"
-                    onClick={() => window.open('https://forum.newrussia.online/', '_blank')}
+                    onClick={props.openForumModal} 
                     style={{ cursor: 'pointer' }}
                 >
                     <h2 className="sidebar-card__title">{t.our_forum_title}</h2>
@@ -188,11 +190,13 @@ export default function App() {
     const [donationAmounts, setDonationAmounts] = useState(initialAmounts);
     const [presetAmount, setPresetAmount] = useState('0');
     const [status, setStatus] = useState({ message: '', type: 'idle', hash: null });
+    const [isForumModalOpen, setForumModalOpen] = useState(false); 
 
     const t = translationData[lang];
     const navigate = useNavigate();
     const selectedToken = TOKENS[selectedTokenKey];
 
+    const { loginAndRedirect, isLoading: isAuthLoading, error: authError } = useAuth(); 
     const { isConnected, chain } = useAccount();
     const { switchChain } = useSwitchChain();
     const { writeContractAsync } = useWriteContract();
@@ -308,11 +312,24 @@ export default function App() {
         setPresetAmount(sanitizedValue);
     };
 
-
+    const handleAnonymousForumAccess = () => {
+        window.open('https://forum.newrussia.online/', '_blank');
+        setForumModalOpen(false);
+    };
 
     return (
         <div className="app-container">
             <Header t={t} lang={lang} setLang={setLang} />
+
+            {isForumModalOpen && (
+                <ForumLoginModal
+                    t={t}
+                    onClose={() => setForumModalOpen(false)}
+                    onLogin={loginAndRedirect}
+                    onAnonymous={handleAnonymousForumAccess}
+                    isAuthLoading={isAuthLoading}
+                />
+            )}
 
             <Routes>
                 <Route
@@ -336,6 +353,7 @@ export default function App() {
                             handleDonateClick={handleDonateClick}
                             status={status}
                             chain={chain}
+                            openForumModal={() => setForumModalOpen(true)}
                         />
                     }
                 />
@@ -351,7 +369,7 @@ export default function App() {
                     path="/contract-details"
                     element={<ContractDetails t={t} onBack={() => navigate('/')} />}
                 />
-                {/* 👇 УБЕДИТЕСЬ, ЧТО ЭТОТ МАРШРУТ СУЩЕСТВУЕТ И НЕ ЗАКОММЕНТИРОВАН */}
+                
                 <Route
                     path="/admin"
                     element={<AdminPage t={t} />}
