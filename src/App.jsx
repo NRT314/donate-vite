@@ -5,7 +5,6 @@ import { useAccount, useSwitchChain, useWriteContract, usePublicClient, useReadC
 import { parseUnits, formatUnits, createPublicClient, http } from 'viem';
 import { polygon } from 'wagmi/chains';
 
-
 import translationData from './translation.json';
 import { ORGANIZATIONS } from './organizations';
 import { CONTRACT_ADDRESS, TOKENS, ABI, ERC20_ABI, PRESET_NAME } from './constants';
@@ -20,8 +19,8 @@ import CollapsibleCard from './components/CollapsibleCard';
 import VotingPage from './pages/VotingPage';
 import ProposalView from './pages/ProposalView';
 import AdminPage from './pages/AdminPage';
-import { useAuth } from './hooks/useAuth'; 
-import ForumLoginModal from './components/ForumLoginModal'; 
+import ForumLoginModal from './components/ForumLoginModal';
+import DiscourseAuth from './pages/DiscourseAuth';
 
 const initialAmounts = ORGANIZATIONS.reduce((acc, org) => {
     acc[org.address] = '';
@@ -29,7 +28,7 @@ const initialAmounts = ORGANIZATIONS.reduce((acc, org) => {
 }, {});
 
 
-// --- MAINVIEW COMPONENT ---
+// --- MAINVIEW COMPONENT (No changes here) ---
 const MainView = ({ t, lang, navigate, ...props }) => {
     const { data: totalDonated, isLoading: isLoadingTotal, isError } = useReadContract({
         address: CONTRACT_ADDRESS,
@@ -169,7 +168,7 @@ const MainView = ({ t, lang, navigate, ...props }) => {
 
                 <div
                     className="sidebar-card sidebar-link-section"
-                    onClick={props.openForumModal} 
+                    onClick={props.openForumModal}
                     style={{ cursor: 'pointer' }}
                 >
                     <h2 className="sidebar-card__title">{t.our_forum_title}</h2>
@@ -190,13 +189,12 @@ export default function App() {
     const [donationAmounts, setDonationAmounts] = useState(initialAmounts);
     const [presetAmount, setPresetAmount] = useState('0');
     const [status, setStatus] = useState({ message: '', type: 'idle', hash: null });
-    const [isForumModalOpen, setForumModalOpen] = useState(false); 
+    const [isForumModalOpen, setForumModalOpen] = useState(false);
 
     const t = translationData[lang];
     const navigate = useNavigate();
     const selectedToken = TOKENS[selectedTokenKey];
 
-    const { loginAndRedirect, isLoading: isAuthLoading, error: authError } = useAuth(); 
     const { isConnected, chain } = useAccount();
     const { switchChain } = useSwitchChain();
     const { writeContractAsync } = useWriteContract();
@@ -240,7 +238,6 @@ export default function App() {
                 args: [CONTRACT_ADDRESS, parsedTotalAmount],
             });
 
-            // ждём approve
             await waitWithFallback(approveHash);
 
             setStatus({ message: t.status_sending, type: 'pending', hash: null });
@@ -254,7 +251,6 @@ export default function App() {
                 ...donateArgs,
             });
 
-            // ждём donate
             await waitWithFallback(donateHash);
 
             setStatus({ message: t.status_success, type: 'success', hash: donateHash });
@@ -269,7 +265,6 @@ export default function App() {
         }
     };
 
-    // 👇 функция ожидания с фоллбэком
     const waitWithFallback = async (hash) => {
         const fallbackClient = createPublicClient({
             chain: polygon,
@@ -282,11 +277,9 @@ export default function App() {
                 return await publicClient.waitForTransactionReceipt({ hash });
             } catch (e) {
                 lastError = e;
-                // пробуем через polygon-rpc.com
                 try {
                     return await fallbackClient.waitForTransactionReceipt({ hash });
                 } catch (_) {
-                    // подождём и попробуем снова
                     await new Promise(res => setTimeout(res, 4000));
                 }
             }
@@ -317,6 +310,11 @@ export default function App() {
         setForumModalOpen(false);
     };
 
+    const handleLoginToForum = () => {
+        // This simply redirects to the forum. Discourse will handle the SSO redirect.
+        window.location.href = 'https://forum.newrussia.online/';
+    };
+
     return (
         <div className="app-container">
             <Header t={t} lang={lang} setLang={setLang} />
@@ -325,9 +323,9 @@ export default function App() {
                 <ForumLoginModal
                     t={t}
                     onClose={() => setForumModalOpen(false)}
-                    onLogin={loginAndRedirect}
+                    onLogin={handleLoginToForum}
                     onAnonymous={handleAnonymousForumAccess}
-                    isAuthLoading={isAuthLoading}
+                    isAuthLoading={false}
                 />
             )}
 
@@ -369,10 +367,15 @@ export default function App() {
                     path="/contract-details"
                     element={<ContractDetails t={t} onBack={() => navigate('/')} />}
                 />
-                
+
                 <Route
                     path="/admin"
                     element={<AdminPage t={t} />}
+                />
+
+                <Route
+                    path="/discourse-auth"
+                    element={<DiscourseAuth t={t} />}
                 />
             </Routes>
 
