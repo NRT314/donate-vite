@@ -312,7 +312,7 @@ export default function App() {
 
     const handleLoginToForum = () => {
         // This simply redirects to the forum. Discourse will handle the SSO redirect.
-        window.location.href = 'https://forum.newrussia.online/';
+    window.location.href = 'https://forum.newrussia.online/session/sso?return_path=/';
     };
 
     return (
