@@ -52,6 +52,7 @@ const configuration = {
 };
 
 const oidc = new Provider(ISSUER, configuration);
+oidc.proxy = true; // <-- ДОБАВЬТЕ ЭТУ СТРОКУ
 
 // Используем Koa-совместимое middleware
 oidc.app.use(cors({ origin: process.env.FRONTEND_URL })); // Ограничиваем CORS
