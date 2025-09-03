@@ -13,7 +13,6 @@ import {
 import {
   WagmiProvider,
   http,
-  // createConfig, // <--- Удалено
 } from 'wagmi';
 import { polygon } from 'wagmi/chains';
 import {
@@ -21,7 +20,6 @@ import {
   QueryClient,
 } from '@tanstack/react-query';
 
-// 👇 Читаем из .env
 const projectId = import.meta.env.VITE_PROJECT_ID;
 const polygonRpcUrl = import.meta.env.VITE_POLYGON_RPC_URL;
 
@@ -33,7 +31,6 @@ if (!polygonRpcUrl) {
   throw new Error("VITE_POLYGON_RPC_URL is not defined in .env file. Please add your RPC URL.");
 }
 
-// 👇 Переопределяем chain, чтобы RainbowKit тоже использовал твой RPC
 const customPolygon = {
   ...polygon,
   rpcUrls: {
@@ -46,7 +43,7 @@ const customPolygon = {
   },
 };
 
-// 👇 Создаём конфиг wagmi + RainbowKit
+// Создаём конфиг wagmi + RainbowKit
 const config = getDefaultConfig({
   appName: 'NRT Donate',
   projectId,
@@ -54,6 +51,7 @@ const config = getDefaultConfig({
   transports: {
     [polygon.id]: http(polygonRpcUrl),
   },
+  ssr: false, // <-- ВОТ ВАЖНОЕ ИЗМЕНЕНИЕ
 });
 
 const queryClient = new QueryClient();
