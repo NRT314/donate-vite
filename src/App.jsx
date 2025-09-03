@@ -19,7 +19,7 @@ import CollapsibleCard from './components/CollapsibleCard';
 import VotingPage from './pages/VotingPage';
 import ProposalView from './pages/ProposalView';
 import AdminPage from './pages/AdminPage';
-import ForumLoginModal from './components/ForumLoginModal';
+// import ForumLoginModal from './components/ForumLoginModal'; // <<-- УДАЛЕНО
 import DiscourseAuth from './pages/DiscourseAuth';
 
 const initialAmounts = ORGANIZATIONS.reduce((acc, org) => {
@@ -28,7 +28,7 @@ const initialAmounts = ORGANIZATIONS.reduce((acc, org) => {
 }, {});
 
 
-// --- MAINVIEW COMPONENT (No changes here) ---
+// --- MAINVIEW COMPONENT (Изменена кнопка "Наш форум") ---
 const MainView = ({ t, lang, navigate, ...props }) => {
     const { data: totalDonated, isLoading: isLoadingTotal, isError } = useReadContract({
         address: CONTRACT_ADDRESS,
@@ -166,13 +166,16 @@ const MainView = ({ t, lang, navigate, ...props }) => {
                     <h2 className="sidebar-card__title">{t.use_nrt_for_voting}</h2>
                 </div>
 
-                <div
+                {/* <<-- НАЧАЛО ИЗМЕНЕНИЙ -->> */}
+                <a
+                    href="https://forum.newrussia.online/"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="sidebar-card sidebar-link-section"
-                    onClick={props.openForumModal}
-                    style={{ cursor: 'pointer' }}
                 >
                     <h2 className="sidebar-card__title">{t.our_forum_title}</h2>
-                </div>
+                </a>
+                {/* <<-- КОНЕЦ ИЗМЕНЕНИЙ -->> */}
 
                 <ContactForm t={t} />
             </aside>
@@ -189,7 +192,7 @@ export default function App() {
     const [donationAmounts, setDonationAmounts] = useState(initialAmounts);
     const [presetAmount, setPresetAmount] = useState('0');
     const [status, setStatus] = useState({ message: '', type: 'idle', hash: null });
-    const [isForumModalOpen, setForumModalOpen] = useState(false);
+    // const [isForumModalOpen, setForumModalOpen] = useState(false); // <<-- УДАЛЕНО
 
     const t = translationData[lang];
     const navigate = useNavigate();
@@ -305,29 +308,16 @@ export default function App() {
         setPresetAmount(sanitizedValue);
     };
 
-    const handleAnonymousForumAccess = () => {
-        window.open('https://forum.newrussia.online/', '_blank');
-        setForumModalOpen(false);
-    };
-
-    const handleLoginToForum = () => {
-        // This simply redirects to the forum. Discourse will handle the SSO redirect.
-    window.location.href = 'https://forum.newrussia.online/session/sso?return_path=/';
-    };
+    // <<-- ВСЯ ЛОГИКА МОДАЛЬНОГО ОКНА УДАЛЕНА -->>
+    // const handleAnonymousForumAccess = () => { ... };
+    // const handleLoginToForum = () => { ... };
 
     return (
         <div className="app-container">
             <Header t={t} lang={lang} setLang={setLang} />
-
-            {isForumModalOpen && (
-                <ForumLoginModal
-                    t={t}
-                    onClose={() => setForumModalOpen(false)}
-                    onLogin={handleLoginToForum}
-                    onAnonymous={handleAnonymousForumAccess}
-                    isAuthLoading={false}
-                />
-            )}
+            
+            {/* <<-- УДАЛЕНО ОТОБРАЖЕНИЕ МОДАЛЬНОГО ОКНА -->> */}
+            {/* {isForumModalOpen && ( ... )} */}
 
             <Routes>
                 <Route
@@ -351,7 +341,7 @@ export default function App() {
                             handleDonateClick={handleDonateClick}
                             status={status}
                             chain={chain}
-                            openForumModal={() => setForumModalOpen(true)}
+                            // openForumModal={() => setForumModalOpen(true)} // <<-- УДАЛЕНО
                         />
                     }
                 />
@@ -367,18 +357,15 @@ export default function App() {
                     path="/contract-details"
                     element={<ContractDetails t={t} onBack={() => navigate('/')} />}
                 />
-
                 <Route
                     path="/admin"
                     element={<AdminPage t={t} />}
                 />
-
                 <Route
                     path="/discourse-auth"
                     element={<DiscourseAuth t={t} />}
                 />
             </Routes>
-
             <Footer t={t} />
         </div>
     );
