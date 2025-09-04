@@ -52,7 +52,7 @@ const configuration = {
 };
 
 const oidc = new Provider(ISSUER, configuration);
-oidc.proxy = true; // <-- ДОБАВЬТЕ ЭТУ СТРОКУ
+oidc.proxy = true; // <-- ДОБАВЛЕНО
 
 // Используем Koa-совместимое middleware
 oidc.app.use(cors({ origin: process.env.FRONTEND_URL })); // Ограничиваем CORS
@@ -81,8 +81,10 @@ oidc.app.use(async (ctx, next) => {
 
     const result = { login: { accountId: walletAddress.toLowerCase() } };
 
+    console.log('Finishing interaction for uid:', uid);
+
     // Завершаем OIDC-процесс. Провайдер сам сделает редирект в Discourse.
-    await oidc.interactionFinished(ctx.req, ctx.res, result, {
+    await oidc.interactionFinished(ctx, result, {
       mergeWithLastSubmission: false
     });
     return;
