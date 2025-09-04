@@ -1,65 +1,46 @@
-// src/pages/DiscourseAuth.jsx (Enhanced ethers.js version)
-import React, { useEffect, useCallback, useRef, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+// src/pages/DiscourseAuth.jsx
+import React, { useState, useEffect, useRef } from 'react';
 import { ethers } from 'ethers';
 
 const API_URL = import.meta.env.VITE_API_URL;
 
 export default function DiscourseAuth({ t }) {
-  const [searchParams] = useSearchParams();
-  const uid = searchParams.get('uid');
-  const navigate = useNavigate();
+  const [status, setStatus] = useState('Initializing...');
+  const [showButton, setShowButton] = useState(false);
+  const flowStartedRef = useRef(false);
 
-  const [status, setStatus] = useState(t?.forum_login_init ?? 'Initializing authentication...');
-  const [showManualButton, setShowManualButton] = useState(false);
-  const flowStartedRef = useRef(false); // Prevents double execution in React StrictMode
-
-  // This function ensures the message format is consistent
-  const buildMessage = (uid) => `Sign this message to login to the forum: ${uid}`;
-
-  const startFlow = useCallback(async () => {
-    if (!uid) {
-      setStatus('Error: Missing session identifier (uid).');
-      return;
-    }
+  const startLogin = async () => {
     if (flowStartedRef.current) return;
     flowStartedRef.current = true;
-    setShowManualButton(false); // Hide button once flow starts
+    setShowButton(false);
 
-    if (typeof window === 'undefined' || typeof window.ethereum === 'undefined') {
-      setStatus('Wallet not found. Please install a browser extension wallet like MetaMask.');
+    if (!window.ethereum) {
+      setStatus('Wallet not found. Please install MetaMask or another wallet.');
+      flowStartedRef.current = false;
       return;
     }
 
     try {
-      setStatus(t?.forum_login_connecting_wallet ?? 'Connecting wallet...');
+      setStatus('Connecting wallet...');
       const provider = new ethers.BrowserProvider(window.ethereum);
+      const accounts = await provider.send('eth_requestAccounts', []);
+      const walletAddress = accounts[0];
 
-      let accounts;
-      try {
-        // This might be blocked by the browser if not triggered by a user click
-        accounts = await provider.send('eth_requestAccounts', []);
-      } catch (err) {
-        // If blocked, we show a manual button for the user to click
-        console.warn('eth_requestAccounts was blocked, showing manual button.');
-        setStatus('Please click the button below to connect your wallet.');
-        setShowManualButton(true);
-    flowStartedRef.current = false; // Allow the flow to be re-triggered by the button
-        return;
-      }
+      if (!walletAddress) throw new Error('No wallet found');
 
-      const currentAddress = accounts?.[0];
-      if (!currentAddress) throw new Error('Could not get wallet address.');
+      setStatus('Requesting login session...');
+      const uidRes = await fetch(`${API_URL}/wallet-login-start`);
+      const { uid } = await uidRes.json();
 
-      setStatus(t?.forum_login_signing ?? 'Please sign the message in your wallet...');
+      setStatus('Signing message...');
       const signer = await provider.getSigner();
-      const message = buildMessage(uid);
+      const message = `Sign this message to login to the forum: ${uid}`;
       const signature = await signer.signMessage(message);
 
-      setStatus(t?.forum_login_verifying ?? 'Verifying...');
+      setStatus('Verifying wallet and redirecting...');
       const form = document.createElement('form');
       form.method = 'POST';
-      form.action = `${API_URL}/oidc/wallet-callback`;
+      form.action = `${API_URL}/wallet-login-callback`;
       form.style.display = 'none';
 
       const addInput = (name, value) => {
@@ -69,40 +50,34 @@ export default function DiscourseAuth({ t }) {
         input.value = value;
         form.appendChild(input);
       };
+
       addInput('uid', uid);
-      addInput('walletAddress', currentAddress);
+      addInput('walletAddress', walletAddress);
       addInput('signature', signature);
 
       document.body.appendChild(form);
       form.submit();
     } catch (err) {
-      console.error('DiscourseAuth error:', err);
-      const msg = err?.message || 'An unexpected error occurred';
-      setStatus(`Error: ${msg}`);
-      setShowManualButton(true); // Show button on error to allow retry
-  flowStartedRef.current = false;
+      console.error(err);
+      setStatus(`Error: ${err.message}`);
+      setShowButton(true);
+    } finally {
+      flowStartedRef.current = false;
     }
-  }, [uid, t]);
+  };
 
-  // Try to start the flow automatically when the component loads
   useEffect(() => {
-    startFlow();
-  }, [startFlow]);
+    startLogin();
+  }, []);
 
   return (
     <div style={{ padding: '2rem', textAlign: 'center' }}>
       <h2>{t?.forum_login_title ?? 'Discourse Authentication'}</h2>
       <p>{status}</p>
-
-      {showManualButton && (
-        <div style={{ marginTop: '1.5rem' }}>
-          <button
-            onClick={startFlow}
-            className="button button--primary" // Using your app's button classes
-          >
-            {t?.forum_login_connect_button ?? 'Connect Wallet'}
-          </button>
-        </div>
+      {showButton && (
+        <button className="button button--primary" onClick={startLogin}>
+          {t?.forum_login_connect_button ?? 'Connect Wallet'}
+        </button>
       )}
     </div>
   );
