@@ -1,4 +1,3 @@
-// src/main.tsx (Final Corrected Version)
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
@@ -19,19 +18,17 @@ if (!projectId) {
 
 const config = getDefaultConfig({
   appName: 'NRT dApp',
-  projectId: projectId,
-  chains: [polygon],
+  projectId,
   ssr: false, 
 });
 
 const queryClient = new QueryClient();
 
-// The exclamation mark tells TypeScript that this element will never be null.
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider>
+        <RainbowKitProvider chains={[polygon]}>
           <BrowserRouter>
             <App />
           </BrowserRouter>
