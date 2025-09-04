@@ -1,4 +1,4 @@
-// backend/oidc.js (FINAL VERSION WITH SPECIALIST'S FIXES)
+// backend/oidc.js (ФИНАЛЬНАЯ ВЕРСИЯ С ИСПРАВЛЕНИЯМИ СПЕЦИАЛИСТА)
 const { Provider } = require('oidc-provider');
 const bodyParser = require('koa-bodyparser');
 const cors = require('@koa/cors');
@@ -36,14 +36,16 @@ const configuration = {
 
   interactions: {
     url(ctx, interaction) {
-      return `/discourse-auth.html?uid=${interaction.uid}`;
+      // Указываем на фронтенд React-приложение
+      return `${process.env.FRONTEND_URL}/discourse-auth?uid=${interaction.uid}`;
     },
   },
 
+  // Эти настройки cookie критически важны для работы между разными доменами
   cookies: {
     keys: [process.env.OIDC_COOKIE_SECRET],
-    long: { signed: true, httpOnly: true, sameSite: 'none', secure: true },
     short: { signed: true, httpOnly: true, sameSite: 'none', secure: true },
+    long: { signed: true, httpOnly: true, sameSite: 'none', secure: true }
   },
 
   claims: {
@@ -58,9 +60,11 @@ const configuration = {
 const oidc = new Provider(ISSUER, configuration);
 oidc.proxy = true;
 
-oidc.app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
+// Используем Koa-совместимое middleware
+oidc.app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true })); // credentials: true важен для cookie
 oidc.app.use(bodyParser({ enableTypes: ['json', 'form'] }));
 
+// Кастомный эндпоинт для верификации кошелька
 oidc.app.use(async (ctx, next) => {
   if (ctx.path === '/wallet-callback' && ctx.method === 'POST') {
     const { uid, walletAddress, signature } = ctx.request.body;
@@ -68,7 +72,8 @@ oidc.app.use(async (ctx, next) => {
     if (!uid || !walletAddress || !signature) {
       ctx.status = 400; ctx.body = { error: 'Missing parameters' }; return;
     }
-
+    
+    console.log(`[OIDC] Finishing interaction for uid: ${uid}`);
     const message = `Sign this message to login to the forum: ${uid}`;
 
     const isVerified = await verifyWallet(walletAddress, signature, message);
@@ -78,6 +83,7 @@ oidc.app.use(async (ctx, next) => {
 
     const result = { login: { accountId: walletAddress.toLowerCase() } };
     
+    // ИСПОЛЬЗУЕМ ПРАВИЛЬНЫЙ ВЫЗОВ: передаем весь `ctx`
     await oidc.interactionFinished(ctx, result, { mergeWithLastSubmission: false });
     return;
   }

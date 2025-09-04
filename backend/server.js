@@ -1,13 +1,9 @@
-// backend/server.js (ФИНАЛЬНАЯ ВЕРСИЯ)
+// backend/server.js (ФИНАЛЬНАЯ ВЕРСИЯ для работы с React-фронтендом)
 require('dotenv').config();
 const express = require('express');
-const path = require('path');
 const oidc = require('./oidc');
 
 const app = express();
-
-// Раздаем статические файлы (наш HTML) из папки 'public'
-app.use(express.static(path.join(__dirname, 'public')));
 
 // Эндпоинт для мониторинга UptimeRobot, чтобы сервис не "засыпал"
 app.get("/healthz", (req, res) => {
