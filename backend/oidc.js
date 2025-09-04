@@ -3,13 +3,13 @@ const { Provider } = require('oidc-provider');
 const bodyParser = require('koa-bodyparser');
 const cors = require('@koa/cors');
 const { verifyWallet } = require('./walletAuth');
-const RedisAdapter = require('./redisAdapter'); // <<-- ДОБАВЛЕНО
+const RedisAdapter = require('./redisAdapter');
 
 // ВАЖНО: Issuer URL должен совпадать с тем, где будет "жить" провайдер
 const ISSUER = `${process.env.OIDC_ISSUER}/oidc`;
 
 const configuration = {
-  adapter: RedisAdapter, // <<-- ДОБАВЛЕНО
+  adapter: RedisAdapter,
   clients: [
     {
       client_id: 'discourse_client',
@@ -27,7 +27,7 @@ const configuration = {
         return {
           sub,
           email: `${sub.toLowerCase()}@wallet.newrussia.online`,
-          email_verified: true, // Говорим Discourse, что email подтвержден
+          email_verified: true,
           preferred_username: `user_${sub.slice(-6)}`,
           name: `User ${sub.slice(0, 6)}...${sub.slice(-4)}`
         };
@@ -41,7 +41,7 @@ const configuration = {
     },
   },
 
-  claims: { // Явно определяем, какие данные доступны через scopes
+  claims: {
     openid: ['sub'],
     email: ['email', 'email_verified'],
     profile: ['preferred_username', 'name']
@@ -52,11 +52,11 @@ const configuration = {
 };
 
 const oidc = new Provider(ISSUER, configuration);
-oidc.proxy = true; // <-- ДОБАВЛЕНО
+oidc.proxy = true;
 
 // Используем Koa-совместимое middleware
-oidc.app.use(cors({ origin: process.env.FRONTEND_URL })); // Ограничиваем CORS
-oidc.app.use(bodyParser({ enableTypes: ['json', 'form'] })); // <-- ИСПРАВЛЕНО
+oidc.app.use(cors({ origin: process.env.FRONTEND_URL }));
+oidc.app.use(bodyParser({ enableTypes: ['json', 'form'] }));
 
 // Кастомный эндпоинт для верификации кошелька
 oidc.app.use(async (ctx, next) => {
@@ -69,7 +69,6 @@ oidc.app.use(async (ctx, next) => {
       return;
     }
 
-    // ФОРМИРУЕМ ДИНАМИЧЕСКОЕ СООБЩЕНИЕ ДЛЯ ЗАЩИТЫ ОТ REPLAY-АТАК
     const message = `Sign this message to login to the forum: ${uid}`;
 
     const isVerified = await verifyWallet(walletAddress, signature, message);
@@ -79,12 +78,20 @@ oidc.app.use(async (ctx, next) => {
       return;
     }
 
+    // Загружаем детали интеракции
+    const details = await oidc.interactionDetails(ctx.req, ctx.res);
+    console.log('Loaded interaction details:', details);
+
+    if (details.uid !== uid) {
+      console.warn('⚠️ UID mismatch! Provided:', uid, 'Expected:', details.uid);
+    }
+
     const result = { login: { accountId: walletAddress.toLowerCase() } };
 
-    console.log('Finishing interaction for uid:', uid);
+    console.log('Finishing interaction for uid:', details.uid);
 
-    // Завершаем OIDC-процесс. Провайдер сам сделает редирект в Discourse.
-    await oidc.interactionFinished(ctx, result, {
+    // Завершаем OIDC-процесс через interactionFinished
+    await oidc.interactionFinished(ctx.req, ctx.res, result, {
       mergeWithLastSubmission: false
     });
     return;
