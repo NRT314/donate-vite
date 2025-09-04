@@ -1,2 +1,7 @@
+[build]
+  command = "yarn run build"
+  publish = "dist"
+
 [build.environment]
-  YARN_VERSION = "1.22.22"
+  NODE_VERSION = "20"
+  YARN_VERSION = "4.9.2"

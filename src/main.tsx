@@ -6,14 +6,14 @@ import './App.css';
 
 import '@rainbow-me/rainbowkit/styles.css';
 import { getDefaultConfig, RainbowKitProvider } from '@rainbow-me/rainbowkit';
-import { WagmiProvider } from 'wagmi/react';
+import { WagmiProvider } from 'wagmi';
 import { polygon } from 'wagmi/chains';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 
 const projectId = import.meta.env.VITE_PROJECT_ID;
 
 if (!projectId) {
-  throw new Error("VITE_PROJECT_ID is not defined in .env file.");
+  throw new Error('VITE_PROJECT_ID is not defined in .env file.');
 }
 
 const config = getDefaultConfig({
