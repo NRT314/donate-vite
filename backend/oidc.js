@@ -1,6 +1,7 @@
-// backend/oidc.js (ФИНАЛЬНАЯ ВЕРСИЯ)
+// backend/oidc.js (FINAL VERSION WITH SPECIALIST'S FIXES)
 const { Provider } = require('oidc-provider');
 const bodyParser = require('koa-bodyparser');
+const cors = require('@koa/cors');
 const { verifyWallet } = require('./walletAuth');
 const RedisAdapter = require('./redisAdapter');
 
@@ -35,14 +36,14 @@ const configuration = {
 
   interactions: {
     url(ctx, interaction) {
-      // <<-- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: Указываем на локальный файл, а не на внешний фронтенд -->>
       return `/discourse-auth.html?uid=${interaction.uid}`;
     },
   },
 
-  // Настройки cookie для cross-domain больше не нужны, так как проблемы нет
   cookies: {
     keys: [process.env.OIDC_COOKIE_SECRET],
+    long: { signed: true, httpOnly: true, sameSite: 'none', secure: true },
+    short: { signed: true, httpOnly: true, sameSite: 'none', secure: true },
   },
 
   claims: {
@@ -57,10 +58,9 @@ const configuration = {
 const oidc = new Provider(ISSUER, configuration);
 oidc.proxy = true;
 
-// Middleware теперь проще
+oidc.app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
 oidc.app.use(bodyParser({ enableTypes: ['json', 'form'] }));
 
-// Кастомный эндпоинт для верификации кошелька
 oidc.app.use(async (ctx, next) => {
   if (ctx.path === '/wallet-callback' && ctx.method === 'POST') {
     const { uid, walletAddress, signature } = ctx.request.body;
@@ -68,7 +68,7 @@ oidc.app.use(async (ctx, next) => {
     if (!uid || !walletAddress || !signature) {
       ctx.status = 400; ctx.body = { error: 'Missing parameters' }; return;
     }
-    
+
     const message = `Sign this message to login to the forum: ${uid}`;
 
     const isVerified = await verifyWallet(walletAddress, signature, message);
@@ -78,7 +78,6 @@ oidc.app.use(async (ctx, next) => {
 
     const result = { login: { accountId: walletAddress.toLowerCase() } };
     
-    // Используем правильный вызов функции
     await oidc.interactionFinished(ctx, result, { mergeWithLastSubmission: false });
     return;
   }
