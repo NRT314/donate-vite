@@ -41,9 +41,9 @@ const configuration = {
   },
 
   // <<-- НАЧАЛО ИСПРАВЛЕНИЯ №1: Правильные настройки Cookie -->>
+  // Эти настройки критически важны для работы между разными доменами
   cookies: {
     keys: [process.env.OIDC_COOKIE_SECRET],
-    // Эти настройки критически важны для работы между разными доменами
     short: { signed: true, httpOnly: true, sameSite: 'none', secure: true },
     long: { signed: true, httpOnly: true, sameSite: 'none', secure: true }
   },

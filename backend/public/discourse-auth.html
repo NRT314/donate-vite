@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discourse Authentication</title>
+  <style>
+    body { font-family: sans-serif; display: grid; place-items: center; min-height: 100vh; margin: 0; background-color: #f0f2f5; }
+    .container { text-align: center; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .spinner { border: 4px solid rgba(0,0,0,0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: #09f; animation: spin 1s ease infinite; margin: 1rem auto; }
+    .button { background-color: #007bff; color: white; border: none; padding: 12px 20px; border-radius: 5px; font-size: 16px; cursor: pointer; }
+    .button:hover { background-color: #0056b3; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+  <script src="https://cdn.ethers.io/lib/ethers-6.13.1.umd.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h2 id="title">Discourse Authentication</h2>
+    <p id="status">Initializing...</p>
+    <div id="spinner" class="spinner" style="display: none;"></div>
+    <button id="connectButton" class="button" style="display: none;">Connect Wallet</button>
+  </div>
+
+  <script>
+    const API_URL = ''; // The form posts to the same origin, so this can be empty
+    const statusEl = document.getElementById('status');
+    const buttonEl = document.getElementById('connectButton');
+    const spinnerEl = document.getElementById('spinner');
+
+    const buildMessage = (uid) => `Sign this message to login to the forum: ${uid}`;
+
+    const startFlow = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const uid = params.get('uid');
+
+      buttonEl.style.display = 'none';
+      spinnerEl.style.display = 'block';
+
+      if (!uid) {
+        statusEl.textContent = 'Error: Missing session identifier (uid).';
+        spinnerEl.style.display = 'none';
+        return;
+      }
+
+      if (typeof window.ethereum === 'undefined') {
+        statusEl.textContent = 'Wallet not found. Please install a browser extension wallet like MetaMask.';
+        spinnerEl.style.display = 'none';
+        return;
+      }
+
+      try {
+        statusEl.textContent = 'Connecting wallet...';
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const accounts = await provider.send('eth_requestAccounts', []);
+        const currentAddress = accounts?.[0];
+
+        if (!currentAddress) throw new Error('Could not get wallet address.');
+
+        statusEl.textContent = 'Please sign the message in your wallet...';
+        const signer = await provider.getSigner();
+        const message = buildMessage(uid);
+        const signature = await signer.signMessage(message);
+
+        statusEl.textContent = 'Verifying...';
+
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `/oidc/wallet-callback`; // No need for full API_URL
+        form.style.display = 'none';
+
+        const addInput = (name, value) => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = name;
+          input.value = value;
+          form.appendChild(input);
+        };
+        addInput('uid', uid);
+        addInput('walletAddress', currentAddress);
+        addInput('signature', signature);
+
+        document.body.appendChild(form);
+        form.submit();
+      } catch (err) {
+        console.error('Auth error:', err);
+        statusEl.textContent = `Error: ${err.message}`;
+        buttonEl.style.display = 'block';
+        spinnerEl.style.display = 'none';
+      }
+    };
+
+    buttonEl.addEventListener('click', startFlow);
+
+    // Auto-start flow, but show button if it's blocked by browser
+    (async () => {
+      try {
+        // A quick check to see if we can get accounts without a click
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const accounts = await provider.listAccounts();
+        if (accounts.length > 0) {
+          await startFlow();
+        } else {
+          throw new Error("User gesture required.");
+        }
+      } catch (e) {
+        statusEl.textContent = 'Please click the button to connect your wallet.';
+        buttonEl.style.display = 'block';
+      }
+    })();
+  </script>
+</body>
+</html>
