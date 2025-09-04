@@ -1,13 +1,16 @@
-// backend/server.js (ФИНАЛЬНАЯ ВЕРСИЯ для работы с React-фронтендом)
+// backend/server.js (исправлённая версия)
 require('dotenv').config();
 const express = require('express');
 const oidc = require('./oidc');
 
 const app = express();
 
-// Эндпоинт для мониторинга UptimeRobot, чтобы сервис не "засыпал"
-app.get("/healthz", (req, res) => {
-  res.status(200).send("OK");
+// Если стоите за reverse-proxy (Heroku / Render / nginx) — доверяем заголовки
+app.set('trust proxy', 1); // важно для secure cookies и correct req.protocol
+
+// Эндпоинт для мониторинга
+app.get('/healthz', (req, res) => {
+  res.status(200).send('OK');
 });
 
 // Монтируем Koa-приложение OIDC-провайдера на путь /oidc
