@@ -1,7 +1,6 @@
-// backend/oidc.js (ФИНАЛЬНАЯ ВЕРСИЯ С ИСПРАВЛЕНИЯМИ СПЕЦИАЛИСТА)
+// backend/oidc.js (ФИНАЛЬНАЯ ВЕРСИЯ)
 const { Provider } = require('oidc-provider');
 const bodyParser = require('koa-bodyparser');
-const cors = require('@koa/cors');
 const { verifyWallet } = require('./walletAuth');
 const RedisAdapter = require('./redisAdapter');
 
@@ -36,18 +35,15 @@ const configuration = {
 
   interactions: {
     url(ctx, interaction) {
-      return `${process.env.FRONTEND_URL}/discourse-auth?uid=${interaction.uid}`;
+      // <<-- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: Указываем на локальный файл, а не на внешний фронтенд -->>
+      return `/discourse-auth.html?uid=${interaction.uid}`;
     },
   },
 
-  // <<-- НАЧАЛО ИСПРАВЛЕНИЯ №1: Правильные настройки Cookie -->>
-  // Эти настройки критически важны для работы между разными доменами
+  // Настройки cookie для cross-domain больше не нужны, так как проблемы нет
   cookies: {
     keys: [process.env.OIDC_COOKIE_SECRET],
-    short: { signed: true, httpOnly: true, sameSite: 'none', secure: true },
-    long: { signed: true, httpOnly: true, sameSite: 'none', secure: true }
   },
-  // <<-- КОНЕЦ ИСПРАВЛЕНИЯ №1 -->>
 
   claims: {
     openid: ['sub'],
@@ -61,8 +57,7 @@ const configuration = {
 const oidc = new Provider(ISSUER, configuration);
 oidc.proxy = true;
 
-// Используем Koa-совместимое middleware
-oidc.app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true })); // credentials: true важен для cookie
+// Middleware теперь проще
 oidc.app.use(bodyParser({ enableTypes: ['json', 'form'] }));
 
 // Кастомный эндпоинт для верификации кошелька
@@ -73,9 +68,6 @@ oidc.app.use(async (ctx, next) => {
     if (!uid || !walletAddress || !signature) {
       ctx.status = 400; ctx.body = { error: 'Missing parameters' }; return;
     }
-
-    // Добавляем лог для отладки
-    console.log(`[OIDC] Finishing interaction for uid: ${uid}`);
     
     const message = `Sign this message to login to the forum: ${uid}`;
 
@@ -86,10 +78,8 @@ oidc.app.use(async (ctx, next) => {
 
     const result = { login: { accountId: walletAddress.toLowerCase() } };
     
-    // <<-- НАЧАЛО ИСПРАВЛЕНИЯ №2: Правильный вызов функции -->>
-    // ИСПОЛЬЗУЕМ ПРАВИЛЬНЫЙ ВЫЗОВ: передаем весь `ctx`, а не ctx.req, ctx.res
+    // Используем правильный вызов функции
     await oidc.interactionFinished(ctx, result, { mergeWithLastSubmission: false });
-    // <<-- КОНЕЦ ИСПРАВЛЕНИЯ №2 -->>
     return;
   }
 

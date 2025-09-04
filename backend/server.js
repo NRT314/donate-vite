@@ -1,20 +1,18 @@
-// backend/server.js (ФИНАЛЬНАЯ ВЕРСИЯ OIDC)
+// backend/server.js (ФИНАЛЬНАЯ ВЕРСИЯ)
 require('dotenv').config();
 const express = require('express');
-const path = require('path'); // <<-- ДОБАВЬТЕ ЭТУ СТРОКУ
+const path = require('path');
 const oidc = require('./oidc');
 
 const app = express();
 
-// <<-- НАЧАЛО ИЗМЕНЕНИЙ -->>
 // Раздаем статические файлы (наш HTML) из папки 'public'
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Эндпоинт для мониторинга UptimeRobot
+// Эндпоинт для мониторинга UptimeRobot, чтобы сервис не "засыпал"
 app.get("/healthz", (req, res) => {
   res.status(200).send("OK");
 });
-// <<-- КОНЕЦ ИЗМЕНЕНИЙ -->>
 
 // Монтируем Koa-приложение OIDC-провайдера на путь /oidc
 app.use('/oidc', oidc.callback());
