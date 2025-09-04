@@ -1,85 +1,99 @@
-// backend/oidc.js
-import Koa from 'koa';
-import Router from '@koa/router';
-import bodyParser from 'koa-bodyparser';
-import cors from '@koa/cors';
-import jwt from 'jsonwebtoken';
-import { verifyWallet } from './walletAuth.js';
-import { v4 as uuidv4 } from 'uuid';
+// backend/oidc.js (ФИНАЛЬНАЯ ВЕРСИЯ С ИСПРАВЛЕНИЯМИ СПЕЦИАЛИСТА)
+const { Provider } = require('oidc-provider');
+const bodyParser = require('koa-bodyparser');
+const cors = require('@koa/cors');
+const { verifyWallet } = require('./walletAuth');
+const RedisAdapter = require('./redisAdapter');
 
-const app = new Koa();
-const router = new Router();
+const ISSUER = `${process.env.OIDC_ISSUER}/oidc`;
 
-const FRONTEND_URL = process.env.FRONTEND_URL;
-const DISCOURSE_URL = process.env.DISCOURSE_URL;
-const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret_long';
+const configuration = {
+  adapter: RedisAdapter,
+  clients: [
+    {
+      client_id: 'discourse_client',
+      client_secret: process.env.OIDC_CLIENT_SECRET,
+      redirect_uris: [`${process.env.DISCOURSE_URL}/auth/oidc/callback`],
+      grant_types: ['authorization_code'],
+      response_types: ['code'],
+    }
+  ],
 
-app.use(cors({ origin: FRONTEND_URL }));
-app.use(bodyParser({ enableTypes: ['json', 'form'] }));
+  async findAccount(ctx, sub) {
+    return {
+      accountId: sub,
+      async claims() {
+        return {
+          sub,
+          email: `${sub.toLowerCase()}@wallet.newrussia.online`,
+          email_verified: true,
+          preferred_username: `user_${sub.slice(-6)}`,
+          name: `User ${sub.slice(0, 6)}...${sub.slice(-4)}`
+        };
+      }
+    };
+  },
 
-// In-memory store for temporary login requests (or Redis if needed)
-const tempLogins = new Map();
+  interactions: {
+    url(ctx, interaction) {
+      return `${process.env.FRONTEND_URL}/discourse-auth?uid=${interaction.uid}`;
+    },
+  },
 
-/**
- * Step 1: Frontend requests a uid for wallet login
- */
-router.get('/wallet-login-start', async (ctx) => {
-  const uid = uuidv4();
-  // store timestamp to auto-expire old uids
-  tempLogins.set(uid, Date.now());
-  ctx.body = { uid };
-});
+  // <<-- НАЧАЛО ИСПРАВЛЕНИЯ №1: Правильные настройки Cookie -->>
+  cookies: {
+    keys: [process.env.OIDC_COOKIE_SECRET],
+    // Эти настройки критически важны для работы между разными доменами
+    short: { signed: true, httpOnly: true, sameSite: 'none', secure: true },
+    long: { signed: true, httpOnly: true, sameSite: 'none', secure: true }
+  },
+  // <<-- КОНЕЦ ИСПРАВЛЕНИЯ №1 -->>
 
-/**
- * Step 2: Frontend POSTs uid + wallet signature
- */
-router.post('/wallet-login-callback', async (ctx) => {
-  const { uid, walletAddress, signature } = ctx.request.body;
+  claims: {
+    openid: ['sub'],
+    email: ['email', 'email_verified'],
+    profile: ['preferred_username', 'name']
+  },
 
-  if (!uid || !walletAddress || !signature) {
-    ctx.status = 400;
-    ctx.body = { error: 'Missing parameters' };
+  features: { devInteractions: { enabled: false } },
+};
+
+const oidc = new Provider(ISSUER, configuration);
+oidc.proxy = true;
+
+// Используем Koa-совместимое middleware
+oidc.app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true })); // credentials: true важен для cookie
+oidc.app.use(bodyParser({ enableTypes: ['json', 'form'] }));
+
+// Кастомный эндпоинт для верификации кошелька
+oidc.app.use(async (ctx, next) => {
+  if (ctx.path === '/wallet-callback' && ctx.method === 'POST') {
+    const { uid, walletAddress, signature } = ctx.request.body;
+
+    if (!uid || !walletAddress || !signature) {
+      ctx.status = 400; ctx.body = { error: 'Missing parameters' }; return;
+    }
+
+    // Добавляем лог для отладки
+    console.log(`[OIDC] Finishing interaction for uid: ${uid}`);
+    
+    const message = `Sign this message to login to the forum: ${uid}`;
+
+    const isVerified = await verifyWallet(walletAddress, signature, message);
+    if (!isVerified) {
+      ctx.status = 401; ctx.body = { error: 'Wallet verification failed' }; return;
+    }
+
+    const result = { login: { accountId: walletAddress.toLowerCase() } };
+    
+    // <<-- НАЧАЛО ИСПРАВЛЕНИЯ №2: Правильный вызов функции -->>
+    // ИСПОЛЬЗУЕМ ПРАВИЛЬНЫЙ ВЫЗОВ: передаем весь `ctx`, а не ctx.req, ctx.res
+    await oidc.interactionFinished(ctx, result, { mergeWithLastSubmission: false });
+    // <<-- КОНЕЦ ИСПРАВЛЕНИЯ №2 -->>
     return;
   }
 
-  // Check if uid exists and is fresh (5 min)
-  const ts = tempLogins.get(uid);
-  if (!ts || Date.now() - ts > 5 * 60 * 1000) {
-    ctx.status = 400;
-    ctx.body = { error: 'Invalid or expired uid' };
-    return;
-  }
-
-  // Verify wallet signature
-  const message = `Sign this message to login to the forum: ${uid}`;
-  const isVerified = await verifyWallet(walletAddress, signature, message);
-  if (!isVerified) {
-    ctx.status = 401;
-    ctx.body = { error: 'Wallet verification failed' };
-    return;
-  }
-
-  // Create JWT for Discourse OIDC login
-  const tokenPayload = {
-    sub: walletAddress.toLowerCase(),
-    email: `${walletAddress.toLowerCase()}@wallet.newrussia.online`,
-    name: `User ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`,
-  };
-
-  const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '5m' });
-
-  // Cleanup uid
-  tempLogins.delete(uid);
-
-  // Redirect to Discourse OIDC callback with token
-  const redirectUrl = `${DISCOURSE_URL}/auth/oidc/callback?code=${token}`;
-  ctx.redirect(redirectUrl);
+  await next();
 });
 
-app.use(router.routes());
-app.use(router.allowedMethods());
-
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => {
-  console.log(`Wallet-login backend running on port ${PORT}`);
-});
+module.exports = oidc;
