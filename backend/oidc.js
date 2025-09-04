@@ -56,7 +56,7 @@ oidc.proxy = true; // <-- ДОБАВЬТЕ ЭТУ СТРОКУ
 
 // Используем Koa-совместимое middleware
 oidc.app.use(cors({ origin: process.env.FRONTEND_URL })); // Ограничиваем CORS
-oidc.app.use(bodyParser());
+oidc.app.use(bodyParser({ enableTypes: ['json', 'form'] })); // <-- ИСПРАВЛЕНО
 
 // Кастомный эндпоинт для верификации кошелька
 oidc.app.use(async (ctx, next) => {
@@ -64,7 +64,9 @@ oidc.app.use(async (ctx, next) => {
     const { uid, walletAddress, signature } = ctx.request.body;
 
     if (!uid || !walletAddress || !signature) {
-      ctx.status = 400; ctx.body = { error: 'Missing parameters' }; return;
+      ctx.status = 400;
+      ctx.body = { error: 'Missing parameters' };
+      return;
     }
 
     // ФОРМИРУЕМ ДИНАМИЧЕСКОЕ СООБЩЕНИЕ ДЛЯ ЗАЩИТЫ ОТ REPLAY-АТАК
@@ -72,13 +74,17 @@ oidc.app.use(async (ctx, next) => {
 
     const isVerified = await verifyWallet(walletAddress, signature, message);
     if (!isVerified) {
-      ctx.status = 401; ctx.body = { error: 'Wallet verification failed' }; return;
+      ctx.status = 401;
+      ctx.body = { error: 'Wallet verification failed' };
+      return;
     }
 
     const result = { login: { accountId: walletAddress.toLowerCase() } };
 
     // Завершаем OIDC-процесс. Провайдер сам сделает редирект в Discourse.
-    await oidc.interactionFinished(ctx.req, ctx.res, result, { mergeWithLastSubmission: false });
+    await oidc.interactionFinished(ctx.req, ctx.res, result, {
+      mergeWithLastSubmission: false
+    });
     return;
   }
 
