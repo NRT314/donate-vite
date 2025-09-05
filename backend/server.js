@@ -2,28 +2,47 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const oidc = require('./oidc'); // Наш OIDC провайдер
+const fs = require('fs'); // Добавляем модуль для работы с файлами
+const oidc = require('./oidc');
 
 const app = express();
 const port = process.env.PORT || 10000;
 
-// Доверяем прокси-серверу (важно для Render.com)
 app.set('trust proxy', 1);
 
-// 1. Монтируем OIDC-провайдер на путь /oidc
 app.use('/oidc', oidc.callback());
 
-// 2. Настраиваем раздачу статических файлов собранного React-приложения
-// Указываем путь к папке 'dist', которая находится в корне проекта
+// ############### НАЧАЛО ДИАГНОСТИЧЕСКОГО КОДА ###############
+// Этот эндпоинт покажет нам, какие файлы лежат в папке dist на сервере
+app.get('/__static_info', (req, res) => {
+  // Путь к папке dist из папки backend (../dist)
+  const buildPath = path.join(__dirname, '..', 'dist');
+  const assetsPath = path.join(buildPath, 'assets');
+  
+  const buildPathExists = fs.existsSync(buildPath);
+  const assetsPathExists = fs.existsSync(assetsPath);
+  
+  const filesInDist = buildPathExists ? fs.readdirSync(buildPath) : [];
+  const filesInAssets = assetsPathExists ? fs.readdirSync(assetsPath) : [];
+
+  res.json({
+    message: "Static files info from the server",
+    timestamp: new Date().toISOString(),
+    buildPathExists,
+    assetsPathExists,
+    filesInDist,
+    filesInAssets,
+  });
+});
+// ############### КОНЕЦ ДИАГНОСТИЧЕСКОГО КОДА ###############
+
 const buildPath = path.join(__dirname, '..', 'dist');
 app.use(express.static(buildPath));
 
-// 3. Для всех остальных запросов отдаем главный index.html, чтобы работал роутинг React
 app.get('*', (req, res) => {
   res.sendFile(path.join(buildPath, 'index.html'));
 });
 
-// Запуск сервера
 app.listen(port, () => {
   console.log(`Server running on port ${port}. OIDC provider is mounted at /oidc`);
 });

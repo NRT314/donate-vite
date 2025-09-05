@@ -1,113 +1,88 @@
-// src/pages/DiscourseAuth.jsx (ФИНАЛЬНАЯ ВЕРСИЯ от специалиста)
-import React, { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { useAccount, useConnect, useSignMessage, useWalletClient } from 'wagmi';
+import React, { useEffect, useState, useRef } from 'react';
+import { useAccount, useSignMessage } from 'wagmi';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 
-const API_URL = import.meta.env.VITE_API_URL;
+function DiscourseAuth() {
+  const [uid, setUid] = useState(null);
+  const [error, setError] = useState('');
+  const formRef = useRef(null);
 
-export default function DiscourseAuth({ t }) {
-  const [searchParams] = useSearchParams();
-  const uid = searchParams.get('uid');
-
-  const [statusText, setStatusText] = useState(
-    t?.forum_login_connecting ?? 'Connecting...'
-  );
-
-  const { status: accountStatus, address } = useAccount();
-  const { data: walletClient } = useWalletClient();
-  const { connectors, connectAsync, isPending: isConnecting } = useConnect();
+  const { address, isConnected } = useAccount();
   const { signMessageAsync } = useSignMessage();
 
-  const preferredConnector = useMemo(() => {
-    if (!connectors?.length) return undefined;
-    const injected =
-      connectors.find((c) => (c.id === 'injected' || c.name?.includes('Injected')) && c.ready) ??
-      connectors.find((c) => c.id?.includes('metamask') && c.ready);
-    return injected ?? connectors[0];
-  }, [connectors]);
-
   useEffect(() => {
-    const run = async () => {
-      try {
-        if (!uid) {
-          setStatusText('Ошибка: отсутствует идентификатор сессии (uid).');
-          return;
-        }
-
-        if (!preferredConnector && !connectors?.length) return;
-
-        let currentAddress = address;
-
-        if (accountStatus !== 'connected') {
-          setStatusText(t?.forum_login_connecting_wallet ?? 'Connecting wallet...');
-          const res = await connectAsync({ connector: preferredConnector });
-          currentAddress = res?.accounts?.[0] ?? currentAddress;
-        }
-
-        if (!currentAddress) {
-          throw new Error('Не удалось определить адрес кошелька.');
-        }
-
-        if (!walletClient && accountStatus !== 'connected') {
-          await new Promise((r) => setTimeout(r, 0));
-        }
-
-        setStatusText(t?.forum_login_signing ?? 'Please sign in your wallet...');
-        const message = `Sign this message to login to the forum: ${uid}`;
-        const signature = await signMessageAsync({ message });
-
-        setStatusText(t?.forum_login_verifying ?? 'Verifying...');
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `${API_URL}/oidc/wallet-callback`;
-        form.style.display = 'none';
-
-        const add = (name, value) => {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = name;
-          input.value = value;
-          form.appendChild(input);
-        };
-
-        add('uid', uid);
-        add('walletAddress', currentAddress);
-        add('signature', signature);
-
-        document.body.appendChild(form);
-        form.submit();
-      } catch (err) {
-        console.error('OIDC wallet login failed:', err);
-        const msg =
-          err?.shortMessage ||
-          err?.message ||
-          t?.forum_login_error_generic ||
-          'Login failed';
-        setStatusText(`Ошибка: ${msg}`);
-      }
-    };
-
-    if (uid && connectors) {
-      if (!isConnecting) run();
+    const urlParams = new URLSearchParams(window.location.search);
+    const uidFromUrl = urlParams.get('uid');
+    if (uidFromUrl) {
+      setUid(uidFromUrl);
+    } else {
+      setError('Ошибка: UID для аутентификации не найден в URL.');
     }
-  }, [
-    uid,
-    connectors,
-    preferredConnector,
-    connectAsync,
-    isConnecting,
-    accountStatus,
-    address,
-    walletClient,
-    signMessageAsync,
-    t,
-  ]);
+  }, []);
+
+  const handleSignAndSubmit = async () => {
+    if (!isConnected || !address) {
+      setError('Пожалуйста, сначала подключите кошелек.');
+      return;
+    }
+    if (!uid) {
+      setError('Не удалось получить UID сессии. Попробуйте войти снова.');
+      return;
+    }
+    setError('');
+
+    try {
+      const messageToSign = `Sign this message to login to the forum: ${uid}`;
+      const signature = await signMessageAsync({ message: messageToSign });
+
+      if (formRef.current) {
+        formRef.current.elements.signature.value = signature;
+        formRef.current.elements.walletAddress.value = address;
+        formRef.current.elements.uid.value = uid;
+        formRef.current.submit();
+      }
+    } catch (e) {
+      console.error('Ошибка при подписании сообщения:', e);
+      setError('Вы отклонили подписание сообщения, или произошла ошибка.');
+    }
+  };
 
   return (
-    <div style={{ padding: '2rem', textAlign: 'center' }}>
-      <h2>{t?.forum_login_title ?? 'Discourse Authentication'}</h2>
-      <p>{statusText}</p>
-      <div className="spinner" style={{ margin: '1rem auto' }} />
+    <div style={{ padding: '20px', fontFamily: 'sans-serif', textAlign: 'center' }}>
+      {/* ===== НАШ ВИЗУАЛЬНЫЙ ТЕСТ ("МАЯЧОК") ===== */}
+      <h1 style={{ color: 'red', fontWeight: 'bold' }}>ПРОВЕРКА ОБНОВЛЕНИЯ КОДА: WAGMI V2</h1>
+      
+      <h1>Аутентификация для форума</h1>
+      <p>Подключите кошелек и подпишите сообщение для завершения входа.</p>
+      
+      <div style={{ margin: '20px 0' }}>
+        <ConnectButton />
+      </div>
+
+      {isConnected && (
+        <button 
+          onClick={handleSignAndSubmit} 
+          style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer' }}
+          disabled={!uid}
+        >
+          Подписать и войти
+        </button>
+      )}
+
+      {error && <p style={{ color: 'red', marginTop: '15px' }}>{error}</p>}
+
+      <form
+        ref={formRef}
+        method="POST"
+        action="https://donate-vite.onrender.com/wallet-callback"
+        style={{ display: 'none' }}
+      >
+        <input type="hidden" name="signature" />
+        <input type="hidden" name="walletAddress" />
+        <input type="hidden" name="uid" />
+      </form>
     </div>
   );
 }
+
+export default DiscourseAuth;
