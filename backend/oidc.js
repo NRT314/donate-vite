@@ -1,7 +1,6 @@
 // backend/oidc.js
 require('dotenv').config();
 
-// ВОЗВРАЩАЕМ bodyParser - он необходим для /wallet-callback
 const bodyParser = require('koa-bodyparser'); 
 const cors = require('@koa/cors');
 const { verifyWallet } = require('./walletAuth');
@@ -71,14 +70,23 @@ oidc.proxy = true;
 
 // Middleware
 oidc.app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
-// ВОЗВРАЩАЕМ bodyParser - он должен идти до нашего кастомного обработчика
-oidc.app.use(bodyParser({ enableTypes: ['json', 'form'] }));
+
+// ИЗМЕНЕНИЕ: Создаем "умный" middleware, который запускает bodyParser только для /wallet-callback
+const conditionalBodyParser = bodyParser({ enableTypes: ['json', 'form'] });
+oidc.app.use(async (ctx, next) => {
+  if (ctx.path === '/wallet-callback') {
+    // Если это наш кастомный эндпоинт, используем bodyParser
+    await conditionalBodyParser(ctx, next);
+  } else {
+    // Для всех остальных путей (включая /oidc/token), пропускаем запрос дальше без изменений
+    await next();
+  }
+});
 
 // Кастомный эндпоинт для верификации кошелька
 oidc.app.use(async (ctx, next) => {
   if (ctx.path === '/wallet-callback' && ctx.method === 'POST') {
     try {
-      // ИСПРАВЛЕНИЕ: Читаем тело из ctx.request.body, которое создает bodyParser
       const { uid, walletAddress, signature } = ctx.request.body || {};
       
       if (!uid || !walletAddress || !signature) {
@@ -112,7 +120,6 @@ oidc.app.use(async (ctx, next) => {
       ctx.body = { error: 'Authentication failed', details: err.message };
     }
   } else {
-    // ВАЖНО: пропускаем другие запросы дальше, чтобы oidc-provider мог их обработать
     await next();
   }
 });
