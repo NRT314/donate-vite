@@ -9,7 +9,7 @@ let Provider;
 try {
   const oidcPkg = require('oidc-provider');
   Provider = oidcPkg.Provider || oidcPkg.default || oidcPkg;
-  if (!Provider) throw new Error('Cannot locate Provider constructor in oidc-provider package');
+  if (!Provider) throw new Error('Cannot locate Provider constructor');
 } catch (err) {
   console.error('Failed to load oidc-provider:', err);
   throw err;
@@ -38,13 +38,7 @@ const configuration = {
     return {
       accountId,
       async claims() {
-        return {
-          sub: accountId,
-          email: `${accountId}@wallet.newrussia.online`,
-          email_verified: true,
-          preferred_username: `user_${accountId.slice(2, 8)}`,
-          name: `User ${accountId.slice(0, 6)}...${accountId.slice(-4)}`,
-        };
+        return { sub: accountId, email: `${accountId}@wallet.newrussia.online`, email_verified: true, preferred_username: `user_${accountId.slice(2, 8)}`, name: `User ${accountId.slice(0, 6)}...${accountId.slice(-4)}` };
       },
     };
   },
@@ -73,42 +67,37 @@ const configuration = {
 const oidc = new Provider(ISSUER, configuration);
 oidc.proxy = true;
 
-// Middleware. bodyParser не нужен, oidc-provider справляется сам.
+// ############### НАЧАЛО ВРЕМЕННОГО ДИАГНОСТИЧЕСКОГО КОДА ###############
+oidc.app.use(async (ctx, next) => {
+  if (ctx.method === 'POST' && ctx.path === '/oidc/token') {
+    console.log('[OIDC-DEBUG] Incoming token request');
+    console.log('[OIDC-DEBUG] Headers:', JSON.stringify(ctx.headers, null, 2));
+    // Тело запроса будет в ctx.oidc.body благодаря встроенному парсеру
+    console.log('[OIDC-DEBUG] Body:', JSON.stringify(ctx.oidc.body, null, 2));
+  }
+  await next();
+});
+// ############### КОНЕЦ ВРЕМЕННОГО ДИАГНОСТИЧЕСКОГО КОДА ###############
+
 oidc.app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
 
-// Кастомный эндпоинт для верификации кошелька
 oidc.app.use(async (ctx, next) => {
   if (ctx.path === '/wallet-callback' && ctx.method === 'POST') {
     try {
-      // oidc-provider сам положит тело запроса в ctx.oidc.body
       const { uid, walletAddress, signature } = ctx.oidc.body || {};
-      
-      if (!uid || !walletAddress || !signature) {
-        ctx.throw(400, 'Missing required parameters');
-      }
-      
+      if (!uid || !walletAddress || !signature) { ctx.throw(400, 'Missing params'); }
       const details = await oidc.interactionDetails(ctx.req, ctx.res);
-      if (details.uid !== uid) {
-        ctx.throw(400, 'UID mismatch or session not found.');
-      }
-      
+      if (details.uid !== uid) { ctx.throw(400, 'UID mismatch'); }
       const message = `Sign this message to login to the forum: ${uid}`;
       const isVerified = await verifyWallet(walletAddress, signature, message);
-      if (!isVerified) {
-        ctx.throw(401, 'Wallet signature verification failed.');
-      }
-      
+      if (!isVerified) { ctx.throw(401, 'Signature verification failed'); }
       const accountId = walletAddress.toLowerCase();
       const result = { login: { accountId } };
-      
       const grant = new oidc.Grant({ accountId, clientId: details.params.client_id });
       grant.addOIDCScope('openid email profile');
-      const grantId = await grant.save();
-      result.consent = { grantId };
-      
+      result.consent = { grantId: await grant.save() };
       await oidc.interactionFinished(ctx.req, ctx.res, result, { mergeWithLastSubmission: false });
       return;
-
     } catch (err) {
       console.error('Error in /wallet-callback:', err);
       ctx.status = err.statusCode || 500;
