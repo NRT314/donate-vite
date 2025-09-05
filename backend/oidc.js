@@ -68,12 +68,9 @@ oidc.proxy = true;
 
 oidc.app.use(cors({ origin: 'https://newrussia.online', credentials: true }));
 
-// Кастомный эндпоинт, который теперь будет доступен по адресу /oidc/wallet-callback
 oidc.app.use(async (ctx, next) => {
-  // oidc-provider "отрезает" префикс /oidc, поэтому мы проверяем только сам путь
   if (ctx.path === '/wallet-callback' && ctx.method === 'POST') {
     try {
-      // bodyParser больше не нужен, oidc-provider сам парсит тело запроса
       const { uid, walletAddress, signature } = ctx.oidc.body || {};
       if (!uid || !walletAddress || !signature) { ctx.throw(400, 'Missing params'); }
       const details = await oidc.interactionDetails(ctx.req, ctx.res);
