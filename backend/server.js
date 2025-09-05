@@ -2,47 +2,31 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const fs = require('fs'); // Добавляем модуль для работы с файлами
-const oidc = require('./oidc');
+const oidc = require('./oidc'); // Наш OIDC провайдер
 
 const app = express();
 const port = process.env.PORT || 10000;
 
 app.set('trust proxy', 1);
 
-app.use('/oidc', oidc.callback());
+// ИЗМЕНЕНИЕ: Монтируем ВСЕ маршруты из oidc.js (включая /oidc/* и /wallet-callback)
+// Это знакомит наш главный сервер с кастомным эндпоинтом.
+app.use(oidc.callback());
 
-// ############### НАЧАЛО ДИАГНОСТИЧЕСКОГО КОДА ###############
-// Этот эндпоинт покажет нам, какие файлы лежат в папке dist на сервере
-app.get('/__static_info', (req, res) => {
-  // Путь к папке dist из папки backend (../dist)
-  const buildPath = path.join(__dirname, '..', 'dist');
-  const assetsPath = path.join(buildPath, 'assets');
-  
-  const buildPathExists = fs.existsSync(buildPath);
-  const assetsPathExists = fs.existsSync(assetsPath);
-  
-  const filesInDist = buildPathExists ? fs.readdirSync(buildPath) : [];
-  const filesInAssets = assetsPathExists ? fs.readdirSync(assetsPath) : [];
-
-  res.json({
-    message: "Static files info from the server",
-    timestamp: new Date().toISOString(),
-    buildPathExists,
-    assetsPathExists,
-    filesInDist,
-    filesInAssets,
-  });
-});
-// ############### КОНЕЦ ДИАГНОСТИЧЕСКОГО КОДА ###############
-
+// Настраиваем раздачу статических файлов собранного React-приложения
 const buildPath = path.join(__dirname, '..', 'dist');
 app.use(express.static(buildPath));
 
+// Для всех остальных GET-запросов отдаем главный index.html, чтобы работал роутинг React
 app.get('*', (req, res) => {
+  // Исключаем наши API-пути из этого правила
+  if (req.path.startsWith('/oidc') || req.path.startsWith('/wallet-callback')) {
+    return;
+  }
   res.sendFile(path.join(buildPath, 'index.html'));
 });
 
+// Запуск сервера
 app.listen(port, () => {
-  console.log(`Server running on port ${port}. OIDC provider is mounted at /oidc`);
+  console.log(`Server running on port ${port}. OIDC provider is available.`);
 });
