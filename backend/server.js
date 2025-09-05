@@ -1,22 +1,29 @@
-// backend/server.js (исправлённая версия)
+// backend/server.js
 require('dotenv').config();
 const express = require('express');
-const oidc = require('./oidc');
+const path = require('path');
+const oidc = require('./oidc'); // Наш OIDC провайдер
 
 const app = express();
+const port = process.env.PORT || 10000;
 
-// Если стоите за reverse-proxy (Heroku / Render / nginx) — доверяем заголовки
-app.set('trust proxy', 1); // важно для secure cookies и correct req.protocol
+// Доверяем прокси-серверу (важно для Render.com)
+app.set('trust proxy', 1);
 
-// Эндпоинт для мониторинга
-app.get('/healthz', (req, res) => {
-  res.status(200).send('OK');
-});
-
-// Монтируем Koa-приложение OIDC-провайдера на путь /oidc
+// 1. Монтируем OIDC-провайдер на путь /oidc
 app.use('/oidc', oidc.callback());
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}. OIDC provider is mounted at /oidc`);
+// 2. Настраиваем раздачу статических файлов собранного React-приложения
+// Указываем путь к папке 'dist', которая находится в корне проекта
+const buildPath = path.join(__dirname, '..', 'dist');
+app.use(express.static(buildPath));
+
+// 3. Для всех остальных запросов отдаем главный index.html, чтобы работал роутинг React
+app.get('*', (req, res) => {
+  res.sendFile(path.join(buildPath, 'index.html'));
+});
+
+// Запуск сервера
+app.listen(port, () => {
+  console.log(`Server running on port ${port}. OIDC provider is mounted at /oidc`);
 });
