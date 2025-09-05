@@ -69,13 +69,15 @@ oidc.proxy = true;
 
 // ############### НАЧАЛО ВРЕМЕННОГО ДИАГНОСТИЧЕСКОГО КОДА ###############
 oidc.app.use(async (ctx, next) => {
+  // Этот middleware должен идти до основного обработчика oidc
+  await next(); // Сначала даем oidc-provider обработать запрос
+
   if (ctx.method === 'POST' && ctx.path.endsWith('/token')) {
-    console.log('[OIDC-DEBUG] Incoming token request');
+    console.log('[OIDC-DEBUG] Token request processed');
     console.log('[OIDC-DEBUG] Headers:', JSON.stringify(ctx.headers, null, 2));
-    // Тело запроса будет в ctx.oidc.body благодаря встроенному парсеру
+    // ИСПРАВЛЕНИЕ: Теперь oidc-provider уже отработал, и тело запроса точно будет в ctx.oidc.body
     console.log('[OIDC-DEBUG] Body:', JSON.stringify(ctx.oidc.body, null, 2));
   }
-  await next();
 });
 // ############### КОНЕЦ ВРЕМЕННОГО ДИАГНОСТИЧЕСКОГО КОДА ###############
 
@@ -109,3 +111,4 @@ oidc.app.use(async (ctx, next) => {
 });
 
 module.exports = oidc;
+
