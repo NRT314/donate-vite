@@ -1,6 +1,9 @@
 // backend/oidc.js
 require('dotenv').config();
 
+// 👇 ДИАГНОСТИЧЕСКАЯ СТРОКА: Проверяем, что переменная окружения загрузилась
+console.log(`[DEBUG] OIDC_ISSUER from env is: >>>${process.env.OIDC_ISSUER}<<<`);
+
 const bodyParser = require('koa-bodyparser');
 const cors = require('@koa/cors');
 const { verifyWallet } = require('./walletAuth');
@@ -17,11 +20,15 @@ try {
   throw err;
 }
 
-// ISSUER должен быть базовым URL без /oidc.
-// Префикс /oidc будет использоваться при монтировании в server.js.
-const ISSUER = process.env.OIDC_ISSUER.replace(/\/$/, '');
+// ✍️ ИСПРАВЛЕННЫЙ КОММЕНТАРИЙ:
+// ISSUER - это полный URL, по которому доступен ваш OIDC провайдер.
+// Он ДОЛЖЕН совпадать с тем, что вы указываете в переменных окружения.
+// Например: https://donate-vite.onrender.com/oidc
+const ISSUER = process.env.OIDC_ISSUER ? process.env.OIDC_ISSUER.replace(/\/$/, '') : undefined;
+
+// Проверка, что ISSUER был успешно прочитан из переменных окружения
 if (!ISSUER) {
-  console.error('FATAL: OIDC_ISSUER environment variable is not set.');
+  console.error('FATAL: OIDC_ISSUER environment variable is not set or is empty.');
   process.exit(1); // Завершаем работу, если критическая переменная отсутствует
 }
 
@@ -46,10 +53,8 @@ const configuration = {
       async claims() {
         return {
           sub: accountId,
-          // Используем accountId, чтобы гарантировать нижний регистр.
           email: `${accountId}@wallet.newrussia.online`,
           email_verified: true,
-          // Генерируем уникальный, но предсказуемый username
           preferred_username: `user_${accountId.slice(2, 8)}`,
           name: `User ${accountId.slice(0, 6)}...${accountId.slice(-4)}`,
         };
@@ -63,8 +68,6 @@ const configuration = {
     },
   },
 
-  // ⚙️ ОСНОВНОЕ ИСПРАВЛЕНИЕ: Добавлен path: '/'
-  // Это гарантирует, что cookie будут действительны для всех путей на домене.
   cookies: {
     keys: [process.env.OIDC_COOKIE_SECRET],
     short: {
@@ -72,14 +75,14 @@ const configuration = {
       httpOnly: true,
       sameSite: 'none',
       secure: true,
-      path: '/', // <--- КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ
+      path: '/',
     },
     long: {
       signed: true,
       httpOnly: true,
       sameSite: 'none',
       secure: true,
-      path: '/', // <--- КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ
+      path: '/',
     },
   },
 
@@ -91,14 +94,13 @@ const configuration = {
 
   features: {
     devInteractions: { enabled: false },
-    // Явно включаем нужные фичи для большей прозрачности
     revocation: { enabled: true },
     introspection: { enabled: true },
   },
 };
 
 const oidc = new Provider(ISSUER, configuration);
-oidc.proxy = true; // Важно для работы за прокси (например, на Render.com)
+oidc.proxy = true;
 
 // Koa middleware
 oidc.app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
@@ -135,8 +137,6 @@ oidc.app.use(async (ctx, next) => {
         login: { accountId },
       };
 
-      // Эта логика - отличный способ избежать лишнего шага "согласия" (consent).
-      // Она создает "разрешение" (grant) для пользователя автоматически.
       const grant = new oidc.Grant({
         accountId,
         clientId: details.params.client_id,
@@ -148,11 +148,10 @@ oidc.app.use(async (ctx, next) => {
       console.log(`[OIDC] Created Grant for account ${accountId}, grantId: ${grantId}`);
       
       await oidc.interactionFinished(ctx.req, ctx.res, result, { mergeWithLastSubmission: false });
-      return; // Завершаем обработку
+      return;
 
     } catch (err) {
       console.error('Error in /wallet-callback:', err);
-      // Отправляем более безопасный и общий ответ пользователю
       ctx.status = err.statusCode || 500;
       ctx.body = { error: 'Authentication failed', details: err.message };
     }
