@@ -1,6 +1,8 @@
 // backend/oidc.js
 require('dotenv').config();
 
+// ВОЗВРАЩАЕМ bodyParser - он необходим для /wallet-callback
+const bodyParser = require('koa-bodyparser'); 
 const cors = require('@koa/cors');
 const { verifyWallet } = require('./walletAuth');
 const RedisAdapter = require('./redisAdapter');
@@ -67,48 +69,52 @@ const configuration = {
 const oidc = new Provider(ISSUER, configuration);
 oidc.proxy = true;
 
-// ############### НАЧАЛО ВРЕМЕННОГО ДИАГНОСТИЧЕСКОГО КОДА ###############
-oidc.app.use(async (ctx, next) => {
-  // Этот middleware должен идти до основного обработчика oidc
-  await next(); // Сначала даем oidc-provider обработать запрос
-
-  if (ctx.method === 'POST' && ctx.path.endsWith('/token')) {
-    console.log('[OIDC-DEBUG] Token request processed');
-    console.log('[OIDC-DEBUG] Headers:', JSON.stringify(ctx.headers, null, 2));
-    // ИСПРАВЛЕНИЕ: Теперь oidc-provider уже отработал, и тело запроса точно будет в ctx.oidc.body
-    console.log('[OIDC-DEBUG] Body:', JSON.stringify(ctx.oidc.body, null, 2));
-  }
-});
-// ############### КОНЕЦ ВРЕМЕННОГО ДИАГНОСТИЧЕСКОГО КОДА ###############
-
+// Middleware
 oidc.app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
+// ВОЗВРАЩАЕМ bodyParser - он должен идти до нашего кастомного обработчика
+oidc.app.use(bodyParser({ enableTypes: ['json', 'form'] }));
 
+// Кастомный эндпоинт для верификации кошелька
 oidc.app.use(async (ctx, next) => {
   if (ctx.path === '/wallet-callback' && ctx.method === 'POST') {
     try {
-      const { uid, walletAddress, signature } = ctx.oidc.body || {};
-      if (!uid || !walletAddress || !signature) { ctx.throw(400, 'Missing params'); }
+      // ИСПРАВЛЕНИЕ: Читаем тело из ctx.request.body, которое создает bodyParser
+      const { uid, walletAddress, signature } = ctx.request.body || {};
+      
+      if (!uid || !walletAddress || !signature) {
+        ctx.throw(400, 'Missing required parameters');
+      }
+      
       const details = await oidc.interactionDetails(ctx.req, ctx.res);
-      if (details.uid !== uid) { ctx.throw(400, 'UID mismatch'); }
+      if (details.uid !== uid) {
+        ctx.throw(400, 'UID mismatch or session not found.');
+      }
+      
       const message = `Sign this message to login to the forum: ${uid}`;
       const isVerified = await verifyWallet(walletAddress, signature, message);
-      if (!isVerified) { ctx.throw(401, 'Signature verification failed'); }
+      if (!isVerified) {
+        ctx.throw(401, 'Wallet signature verification failed.');
+      }
+      
       const accountId = walletAddress.toLowerCase();
       const result = { login: { accountId } };
+      
       const grant = new oidc.Grant({ accountId, clientId: details.params.client_id });
       grant.addOIDCScope('openid email profile');
       result.consent = { grantId: await grant.save() };
+      
       await oidc.interactionFinished(ctx.req, ctx.res, result, { mergeWithLastSubmission: false });
       return;
+
     } catch (err) {
       console.error('Error in /wallet-callback:', err);
       ctx.status = err.statusCode || 500;
       ctx.body = { error: 'Authentication failed', details: err.message };
     }
   } else {
+    // ВАЖНО: пропускаем другие запросы дальше, чтобы oidc-provider мог их обработать
     await next();
   }
 });
 
 module.exports = oidc;
-
