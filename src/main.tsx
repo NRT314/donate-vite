@@ -1,3 +1,4 @@
+// src/main.tsx — проверенный шаблон для wagmi v2 + RainbowKit v2
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
@@ -5,35 +6,41 @@ import App from './App.jsx';
 import './App.css';
 
 import '@rainbow-me/rainbowkit/styles.css';
-import { getDefaultConfig, RainbowKitProvider } from '@rainbow-me/rainbowkit';
-import { WagmiProvider } from 'wagmi';
+import { getDefaultWallets, RainbowKitProvider } from '@rainbow-me/rainbowkit';
+import { configureChains, createClient, WagmiConfig } from 'wagmi';
 import { polygon } from 'wagmi/chains';
-import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
+import { publicProvider } from 'wagmi/providers/public';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const projectId = import.meta.env.VITE_PROJECT_ID;
+if (!projectId) throw new Error('VITE_PROJECT_ID is not defined.');
 
-if (!projectId) {
-  throw new Error('VITE_PROJECT_ID is not defined in .env file.');
-}
+const { chains, publicClient } = configureChains([polygon], [publicProvider()]);
 
-const config = getDefaultConfig({
+const { connectors } = getDefaultWallets({
   appName: 'NRT dApp',
   projectId,
-  chains: [polygon],
+  chains,
+});
+
+const wagmiClient = createClient({
+  autoConnect: true,
+  connectors,
+  publicClient,
 });
 
 const queryClient = new QueryClient();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <WagmiProvider config={config}>
+    <WagmiConfig client={wagmiClient}>
       <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider>
+        <RainbowKitProvider chains={chains}>
           <BrowserRouter>
             <App />
           </BrowserRouter>
         </RainbowKitProvider>
       </QueryClientProvider>
-    </WagmiProvider>
+    </WagmiConfig>
   </React.StrictMode>
 );
