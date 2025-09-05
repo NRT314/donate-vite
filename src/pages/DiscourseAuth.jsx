@@ -1,88 +1,90 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { useAccount, useSignMessage } from 'wagmi';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+// src/pages/DiscourseAuth.jsx
+import React, { useEffect, useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useAccount, useConnect, useSignMessage } from 'wagmi';
 
-function DiscourseAuth() {
-  const [uid, setUid] = useState(null);
-  const [error, setError] = useState('');
-  const formRef = useRef(null);
+const OIDC_SERVER_URL = import.meta.env.VITE_OIDC_SERVER_URL || 'https://donate-vite.onrender.com';
 
+export default function DiscourseAuth() {
+  const [searchParams] = useSearchParams();
+  const uid = searchParams.get('uid');
+  const [statusText, setStatusText] = useState('Инициализация...');
+  
   const { address, isConnected } = useAccount();
-  const { signMessageAsync } = useSignMessage();
+  const { connectors, connectAsync, isPending: isConnecting } = useConnect();
+  const { signMessageAsync, isPending: isSigning } = useSignMessage();
+
+  const preferredConnector = useMemo(() => {
+    if (!connectors?.length) return undefined;
+    return connectors.find((c) => c.id === 'injected' && c.ready) ?? connectors[0];
+  }, [connectors]);
 
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const uidFromUrl = urlParams.get('uid');
-    if (uidFromUrl) {
-      setUid(uidFromUrl);
-    } else {
-      setError('Ошибка: UID для аутентификации не найден в URL.');
-    }
-  }, []);
+    const runAuthentication = async () => {
+      try {
+        if (!uid) {
+          setStatusText('Ошибка: UID сессии не найден.');
+          return;
+        }
 
-  const handleSignAndSubmit = async () => {
-    if (!isConnected || !address) {
-      setError('Пожалуйста, сначала подключите кошелек.');
-      return;
-    }
-    if (!uid) {
-      setError('Не удалось получить UID сессии. Попробуйте войти снова.');
-      return;
-    }
-    setError('');
+        let currentAddress = address;
 
-    try {
-      const messageToSign = `Sign this message to login to the forum: ${uid}`;
-      const signature = await signMessageAsync({ message: messageToSign });
+        if (!isConnected) {
+          setStatusText('Подключаем кошелек...');
+          if (!preferredConnector) {
+            setStatusText('Кошельки не найдены. Пожалуйста, установите MetaMask.');
+            return;
+          }
+          const result = await connectAsync({ connector: preferredConnector });
+          currentAddress = result?.accounts?.[0];
+        }
 
-      if (formRef.current) {
-        formRef.current.elements.signature.value = signature;
-        formRef.current.elements.walletAddress.value = address;
-        formRef.current.elements.uid.value = uid;
-        formRef.current.submit();
+        if (!currentAddress) {
+          throw new Error('Не удалось получить адрес кошелька.');
+        }
+
+        setStatusText('Пожалуйста, подпишите сообщение в вашем кошельке...');
+        const message = `Sign this message to login to the forum: ${uid}`;
+        const signature = await signMessageAsync({ message });
+
+        setStatusText('Проверка подписи...');
+        
+        const form = document.createElement('form');
+        form.method = 'POST';
+        // ИЗМЕНЕНИЕ: Указываем правильный, полный путь, как советовал специалист
+        form.action = `${OIDC_SERVER_URL}/oidc/wallet-callback`;
+        
+        const createInput = (name, value) => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = name;
+          input.value = value;
+          form.appendChild(input);
+        };
+
+        createInput('uid', uid);
+        createInput('walletAddress', currentAddress);
+        createInput('signature', signature);
+        
+        document.body.appendChild(form);
+        form.submit();
+
+      } catch (err) {
+        console.error('Ошибка аутентификации:', err);
+        setStatusText(`Ошибка: ${err.shortMessage || err.message}`);
       }
-    } catch (e) {
-      console.error('Ошибка при подписании сообщения:', e);
-      setError('Вы отклонили подписание сообщения, или произошла ошибка.');
+    };
+    
+    if (uid && connectors && !isConnecting && !isSigning) {
+      runAuthentication();
     }
-  };
+
+  }, [uid, address, isConnected, connectors, connectAsync, signMessageAsync, isConnecting, isSigning, preferredConnector]);
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif', textAlign: 'center' }}>
-      {/* ===== НАШ ВИЗУАЛЬНЫЙ ТЕСТ ("МАЯЧОК") ===== */}
-      <h1 style={{ color: 'red', fontWeight: 'bold' }}>ПРОВЕРКА ОБНОВЛЕНИЯ КОДА: WAGMI V2</h1>
-      
-      <h1>Аутентификация для форума</h1>
-      <p>Подключите кошелек и подпишите сообщение для завершения входа.</p>
-      
-      <div style={{ margin: '20px 0' }}>
-        <ConnectButton />
-      </div>
-
-      {isConnected && (
-        <button 
-          onClick={handleSignAndSubmit} 
-          style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer' }}
-          disabled={!uid}
-        >
-          Подписать и войти
-        </button>
-      )}
-
-      {error && <p style={{ color: 'red', marginTop: '15px' }}>{error}</p>}
-
-      <form
-        ref={formRef}
-        method="POST"
-        action="https://donate-vite.onrender.com/wallet-callback"
-        style={{ display: 'none' }}
-      >
-        <input type="hidden" name="signature" />
-        <input type="hidden" name="walletAddress" />
-        <input type="hidden" name="uid" />
-      </form>
+    <div style={{ padding: '2rem', textAlign: 'center', fontFamily: 'sans-serif' }}>
+      <h2>Аутентификация для форума</h2>
+      <p style={{ fontSize: '18px', minHeight: '30px' }}>{statusText}</p>
     </div>
   );
 }
-
-export default DiscourseAuth;

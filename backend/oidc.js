@@ -1,7 +1,6 @@
 // backend/oidc.js
 require('dotenv').config();
 
-const bodyParser = require('koa-bodyparser'); 
 const cors = require('@koa/cors');
 const { verifyWallet } = require('./walletAuth');
 const RedisAdapter = require('./redisAdapter');
@@ -17,7 +16,6 @@ try {
 }
 
 const ISSUER = process.env.OIDC_ISSUER ? process.env.OIDC_ISSUER.replace(/\/$/, '') : undefined;
-
 if (!ISSUER) {
   console.error('FATAL: OIDC_ISSUER environment variable is not set or is empty.');
   process.exit(1);
@@ -45,7 +43,7 @@ const configuration = {
   },
   interactions: {
     url(ctx, interaction) {
-      return `${process.env.FRONTEND_URL.replace(/\/$/, '')}/discourse-auth?uid=${interaction.uid}`;
+      return `https://newrussia.online/discourse-auth?uid=${interaction.uid}`;
     },
   },
   cookies: {
@@ -68,52 +66,28 @@ const configuration = {
 const oidc = new Provider(ISSUER, configuration);
 oidc.proxy = true;
 
-// Middleware
-oidc.app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
+oidc.app.use(cors({ origin: 'https://newrussia.online', credentials: true }));
 
-// ИЗМЕНЕНИЕ: Создаем "умный" middleware, который запускает bodyParser только для /wallet-callback
-const conditionalBodyParser = bodyParser({ enableTypes: ['json', 'form'] });
+// Кастомный эндпоинт, который теперь будет доступен по адресу /oidc/wallet-callback
 oidc.app.use(async (ctx, next) => {
-  if (ctx.path === '/wallet-callback') {
-    // Если это наш кастомный эндпоинт, используем bodyParser
-    await conditionalBodyParser(ctx, next);
-  } else {
-    // Для всех остальных путей (включая /oidc/token), пропускаем запрос дальше без изменений
-    await next();
-  }
-});
-
-// Кастомный эндпоинт для верификации кошелька
-oidc.app.use(async (ctx, next) => {
+  // oidc-provider "отрезает" префикс /oidc, поэтому мы проверяем только сам путь
   if (ctx.path === '/wallet-callback' && ctx.method === 'POST') {
     try {
-      const { uid, walletAddress, signature } = ctx.request.body || {};
-      
-      if (!uid || !walletAddress || !signature) {
-        ctx.throw(400, 'Missing required parameters');
-      }
-      
+      // bodyParser больше не нужен, oidc-provider сам парсит тело запроса
+      const { uid, walletAddress, signature } = ctx.oidc.body || {};
+      if (!uid || !walletAddress || !signature) { ctx.throw(400, 'Missing params'); }
       const details = await oidc.interactionDetails(ctx.req, ctx.res);
-      if (details.uid !== uid) {
-        ctx.throw(400, 'UID mismatch or session not found.');
-      }
-      
+      if (details.uid !== uid) { ctx.throw(400, 'UID mismatch'); }
       const message = `Sign this message to login to the forum: ${uid}`;
       const isVerified = await verifyWallet(walletAddress, signature, message);
-      if (!isVerified) {
-        ctx.throw(401, 'Wallet signature verification failed.');
-      }
-      
+      if (!isVerified) { ctx.throw(401, 'Signature verification failed'); }
       const accountId = walletAddress.toLowerCase();
       const result = { login: { accountId } };
-      
       const grant = new oidc.Grant({ accountId, clientId: details.params.client_id });
       grant.addOIDCScope('openid email profile');
       result.consent = { grantId: await grant.save() };
-      
       await oidc.interactionFinished(ctx.req, ctx.res, result, { mergeWithLastSubmission: false });
       return;
-
     } catch (err) {
       console.error('Error in /wallet-callback:', err);
       ctx.status = err.statusCode || 500;
