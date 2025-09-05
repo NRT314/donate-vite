@@ -1,9 +1,7 @@
 // backend/oidc.js
 require('dotenv').config();
 
-console.log(`[DEBUG] OIDC_ISSUER from env is: >>>${process.env.OIDC_ISSUER}<<<`);
-
-const bodyParser = require('koa-bodyparser');
+// Убрали 'koa-bodyparser', он больше не нужен
 const cors = require('@koa/cors');
 const { verifyWallet } = require('./walletAuth');
 const RedisAdapter = require('./redisAdapter');
@@ -36,7 +34,6 @@ const configuration = {
       response_types: ['code'],
     },
   ],
-  // ... (остальная конфигурация, как и была: findAccount, interactions, cookies, и т.д.)
   async findAccount(ctx, sub) {
     const accountId = sub.toLowerCase();
     return {
@@ -71,65 +68,41 @@ const configuration = {
 const oidc = new Provider(ISSUER, configuration);
 oidc.proxy = true;
 
-// ############### НАЧАЛО ДИАГНОСТИЧЕСКОГО КОДА ###############
-oidc.app.use(async (ctx, next) => {
-  // логируем входящие запросы к /auth и /token для отладки
-  try {
-    if (ctx.path === '/token' && ctx.method === 'POST') {
-      console.log('[OIDC-DEBUG] Incoming token request');
-      console.log('[OIDC-DEBUG] headers:', JSON.stringify(ctx.headers));
-      const auth = ctx.headers.authorization;
-      if (auth && auth.startsWith('Basic ')) {
-        try {
-          const decoded = Buffer.from(auth.slice(6), 'base64').toString('utf8');
-          console.log('[OIDC-DEBUG] Authorization (decoded):', decoded);
-        } catch (e) {
-          console.log('[OIDC-DEBUG] Authorization decode error:', e && e.message);
-        }
-      }
-      try {
-        console.log('[OIDC-DEBUG] body:', JSON.stringify(ctx.request.body));
-      } catch (e) {
-        console.log('[OIDC-DEBUG] body: <could not stringify>');
-      }
-    }
-
-    if (ctx.path === '/auth' && ctx.method === 'GET') {
-      console.log('[OIDC-DEBUG] Authorization request query:', JSON.stringify(ctx.query));
-    }
-  } catch (e) {
-    console.error('[OIDC-DEBUG] logging middleware error:', e);
-  }
-  await next();
-});
-// ############### КОНЕЦ ДИАГНОСТИЧЕСКОГО КОДА ###############
-
 // Koa middleware
 oidc.app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
-oidc.app.use(bodyParser({ enableTypes: ['json', 'form'] }));
+// Убрали oidc.app.use(bodyParser(...)), т.к. oidc-provider сам обрабатывает тело запроса
 
-// Кастомный эндпоинт для верификации кошелька (остается без изменений)
+// Кастомный эндпоинт для верификации кошелька
 oidc.app.use(async (ctx, next) => {
   if (ctx.path === '/wallet-callback' && ctx.method === 'POST') {
     try {
-      const { uid, walletAddress, signature } = ctx.request.body || {};
+      // oidc-provider сам положит тело в ctx.oidc.body
+      const { uid, walletAddress, signature } = ctx.oidc.body || {}; 
+      
       console.log(`[OIDC] /wallet-callback POST received. uid: ${uid}`);
       console.log(`[OIDC] Request cookies: ${ctx.headers.cookie || 'none'}`);
+
       if (!uid || !walletAddress || !signature) { ctx.throw(400, 'Missing required parameters'); }
+      
       const details = await oidc.interactionDetails(ctx.req, ctx.res);
-      if (details.uid !== uid) { ctx.throw(400, 'UID mismatch or session not found. Please try logging in again.'); }
+      if (details.uid !== uid) { ctx.throw(400, 'UID mismatch or session not found.'); }
+      
       const message = `Sign this message to login to the forum: ${uid}`;
       const isVerified = await verifyWallet(walletAddress, signature, message);
       if (!isVerified) { ctx.throw(401, 'Wallet signature verification failed.'); }
+      
       const accountId = walletAddress.toLowerCase();
       const result = { login: { accountId } };
+      
       const grant = new oidc.Grant({ accountId, clientId: details.params.client_id });
       grant.addOIDCScope('openid email profile');
       const grantId = await grant.save();
       result.consent = { grantId };
+      
       console.log(`[OIDC] Created Grant for account ${accountId}, grantId: ${grantId}`);
       await oidc.interactionFinished(ctx.req, ctx.res, result, { mergeWithLastSubmission: false });
       return;
+
     } catch (err) {
       console.error('Error in /wallet-callback:', err);
       ctx.status = err.statusCode || 500;
