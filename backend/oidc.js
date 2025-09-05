@@ -69,7 +69,7 @@ oidc.proxy = true;
 
 // ############### НАЧАЛО ВРЕМЕННОГО ДИАГНОСТИЧЕСКОГО КОДА ###############
 oidc.app.use(async (ctx, next) => {
-  if (ctx.method === 'POST' && ctx.path === '/oidc/token') {
+  if (ctx.method === 'POST' && ctx.path.endsWith('/token')) {
     console.log('[OIDC-DEBUG] Incoming token request');
     console.log('[OIDC-DEBUG] Headers:', JSON.stringify(ctx.headers, null, 2));
     // Тело запроса будет в ctx.oidc.body благодаря встроенному парсеру
