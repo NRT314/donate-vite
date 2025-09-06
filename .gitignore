@@ -26,3 +26,4 @@ dist-ssr
 # Личные ключи и настройки
 .env
 .env.local
+yarn.lock
