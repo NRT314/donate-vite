@@ -1,10 +1,9 @@
 // backend/oidc.js
 require('dotenv').config();
 
-const bodyParser = require('koa-bodyparser');
 const cors = require('@koa/cors');
 const { verifyWallet } = require('./walletAuth');
-const RedisAdapter = require('./redisAdapter');
+const RedisAdapter = require('./redisAdapter'); // ВОЗВРАЩАЕМ REDIS
 
 let Provider;
 try {
@@ -23,7 +22,7 @@ if (!ISSUER) {
 }
 
 const configuration = {
-  adapter: RedisAdapter,
+  adapter: RedisAdapter, // ВОЗВРАЩАЕМ REDIS
   clients: [
     {
       client_id: 'discourse_client',
@@ -33,93 +32,67 @@ const configuration = {
       response_types: ['code'],
     },
   ],
-  async findAccount(ctx, sub) { /* ... без изменений ... */ },
-  interactions: { /* ... без изменений ... */ },
-  cookies: { /* ... без изменений ... */ },
-  claims: { /* ... без изменений ... */ },
-  features: { /* ... без изменений ... */ },
+  async findAccount(ctx, sub) {
+    const accountId = sub.toLowerCase();
+    return {
+      accountId,
+      async claims() {
+        return { sub: accountId, email: `${accountId}@wallet.newrussia.online`, email_verified: true, preferred_username: `user_${accountId.slice(2, 8)}`, name: `User ${accountId.slice(0, 6)}...${accountId.slice(-4)}` };
+      },
+    };
+  },
+  interactions: {
+    url(ctx, interaction) {
+      return `https://newrussia.online/discourse-auth?uid=${interaction.uid}`;
+    },
+  },
+  cookies: {
+    keys: [process.env.OIDC_COOKIE_SECRET],
+    short: { signed: true, httpOnly: true, sameSite: 'none', secure: true, path: '/' },
+    long: { signed: true, httpOnly: true, sameSite: 'none', secure: true, path: '/' },
+  },
+  claims: {
+    openid: ['sub'],
+    email: ['email', 'email_verified'],
+    profile: ['preferred_username', 'name'],
+  },
+  features: {
+    devInteractions: { enabled: false },
+    revocation: { enabled: true },
+    introspection: { enabled: true },
+  },
 };
 
 const oidc = new Provider(ISSUER, configuration);
 oidc.proxy = true;
 
-// --- ДИАГНОСТИЧЕСКИЙ ЛОГЕР OIDC (рекомендация специалиста) ---
-oidc.app.use(async (ctx, next) => {
-  console.log(`[OIDC-REQ] ${ctx.method} ${ctx.path} Cookie=${ctx.headers.cookie || '<none>'}`);
-  await next();
-});
-// -------------------------------------------------------------
-
 oidc.app.use(cors({ origin: 'https://newrussia.online', credentials: true }));
 
-const conditionalBodyParser = bodyParser({ enableTypes: ['json', 'form'] });
 oidc.app.use(async (ctx, next) => {
-  if (ctx.path === '/wallet-callback') {
-    await conditionalBodyParser(ctx, next);
+  if (ctx.path === '/wallet-callback' && ctx.method === 'POST') {
+    try {
+      const { uid, walletAddress, signature } = ctx.oidc.body || {};
+      if (!uid || !walletAddress || !signature) { ctx.throw(400, 'Missing params'); }
+      const details = await oidc.interactionDetails(ctx.req, ctx.res);
+      if (details.uid !== uid) { ctx.throw(400, 'UID mismatch'); }
+      const message = `Sign this message to login to the forum: ${uid}`;
+      const isVerified = await verifyWallet(walletAddress, signature, message);
+      if (!isVerified) { ctx.throw(401, 'Signature verification failed'); }
+      const accountId = walletAddress.toLowerCase();
+      const result = { login: { accountId } };
+      const grant = new oidc.Grant({ accountId, clientId: details.params.client_id });
+      grant.addOIDCScope('openid email profile');
+      result.consent = { grantId: await grant.save() };
+      await oidc.interactionFinished(ctx.req, ctx.res, result, { mergeWithLastSubmission: false });
+      return;
+    } catch (err) {
+      console.error('Error in /wallet-callback:', err);
+      ctx.status = err.statusCode || 500;
+      ctx.body = { error: 'Authentication failed', details: err.message };
+    }
   } else {
     await next();
   }
 });
-
-// Кастомный эндпоинт с детальным логированием (рекомендация специалиста)
-oidc.app.use(async (ctx, next) => {
-  if (!(ctx.path === '/wallet-callback' && ctx.method === 'POST')) {
-    return await next();
-  }
-
-  console.log('[OIDC] /wallet-callback POST handler entered');
-  const body = ctx.request.body || {};
-  console.log('[OIDC] Raw body keys:', Object.keys(body));
-  const { uid, walletAddress, signature } = body;
-
-  if (!uid || !walletAddress || !signature) {
-    console.warn('[OIDC] /wallet-callback: missing params', { uid, signaturePresent: !!signature });
-    ctx.status = 400;
-    ctx.body = { error: 'Missing parameters' };
-    return;
-  }
-
-  let details;
-  try {
-    console.log('[OIDC] Attempting interactionDetails(ctx.req, ctx.res)...');
-    details = await oidc.interactionDetails(ctx.req, ctx.res);
-    console.log('[OIDC] interactionDetails(req,res) succeeded, uid=', details?.uid);
-  } catch (e) {
-    console.error('[OIDC] interactionDetails failed:', e.message);
-    ctx.status = 500;
-    ctx.body = { error: 'interactionDetails failed', details: e.message };
-    return;
-  }
-
-  if (details.uid !== uid) {
-    console.warn('[OIDC] UID mismatch!', { detailsUid: details.uid, postedUid: uid });
-    ctx.status = 400;
-    ctx.body = { error: 'UID mismatch or session not found' };
-    return;
-  }
-
-  const message = `Sign this message to login to the forum: ${uid}`;
-  const isVerified = await verifyWallet(walletAddress, signature, message);
-  console.log('[OIDC] verifyWallet result:', isVerified);
-  if (!isVerified) {
-    ctx.status = 401;
-    ctx.body = { error: 'Wallet verification failed' };
-    return;
-  }
-
-  const accountId = walletAddress.toLowerCase();
-  const result = { login: { accountId } };
-  const grant = new oidc.Grant({ accountId, clientId: details.params.client_id });
-  grant.addOIDCScope('openid email profile');
-  result.consent = { grantId: await grant.save() };
-  console.log('[OIDC] Grant created, grantId:', grant.grantId);
-
-  await oidc.interactionFinished(ctx.req, ctx.res, result, { mergeWithLastSubmission: false });
-  console.log('[OIDC] interactionFinished successfully.');
-});
-
-// Добавим async findAccount и другие части, чтобы файл был полным
-configuration.asyncfindAccount = async (ctx, sub) => { /* ... */ };
-configuration.interactions.url = (ctx, interaction) => `https://newrussia.online/discourse-auth?uid=${interaction.uid}`;
 
 module.exports = oidc;
