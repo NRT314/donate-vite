@@ -1,8 +1,7 @@
 // backend/oidc.js
 require('dotenv').config();
 
-// ВОЗВРАЩАЕМ bodyParser - он необходим для /wallet-callback
-const bodyParser = require('koa-bodyparser'); 
+const bodyParser = require('koa-bodyparser');
 const cors = require('@koa/cors');
 const { verifyWallet } = require('./walletAuth');
 const RedisAdapter = require('./redisAdapter');
@@ -12,7 +11,7 @@ try {
   const oidcPkg = require('oidc-provider');
   Provider = oidcPkg.Provider || oidcPkg.default || oidcPkg;
   if (!Provider) throw new Error('Cannot locate Provider constructor');
-} catch (err)
+} catch (err) { // ИСПРАВЛЕНИЕ: Добавлены недостающие фигурные скобки {}
   console.error('Failed to load oidc-provider:', err);
   throw err;
 }
@@ -72,15 +71,11 @@ oidc.proxy = true;
 // Middleware
 oidc.app.use(cors({ origin: 'https://newrussia.online', credentials: true }));
 
-// ИЗМЕНЕНИЕ: Создаем "умный" middleware, который запускает bodyParser только для /wallet-callback
 const conditionalBodyParser = bodyParser({ enableTypes: ['json', 'form'] });
 oidc.app.use(async (ctx, next) => {
-  // oidc-provider "отрезает" префикс /oidc, поэтому мы проверяем только сам путь
   if (ctx.path === '/wallet-callback') {
-    // Если это наш кастомный эндпоинт, используем bodyParser
     await conditionalBodyParser(ctx, next);
   } else {
-    // Для всех остальных путей (включая /token), пропускаем запрос дальше без изменений
     await next();
   }
 });
@@ -89,7 +84,6 @@ oidc.app.use(async (ctx, next) => {
 oidc.app.use(async (ctx, next) => {
   if (ctx.path === '/wallet-callback' && ctx.method === 'POST') {
     try {
-      // ИСПРАВЛЕНИЕ: Читаем тело из ctx.request.body, которое создает bodyParser
       const { uid, walletAddress, signature } = ctx.request.body || {};
       
       if (!uid || !walletAddress || !signature) {
