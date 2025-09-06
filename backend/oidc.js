@@ -28,10 +28,14 @@ const configuration = {
     {
       client_id: 'discourse_client',
       client_secret: process.env.OIDC_CLIENT_SECRET,
-      redirect_uris: [`${process.env.DISCOURSE_URL.replace(/\/$/, '')}/auth/oidc/callback`],
+      redirect_uris: [
+        `${process.env.DISCOURSE_URL.replace(/\/$/, '')}/auth/oidc/callback`
+      ],
       grant_types: ['authorization_code'],
       response_types: ['code'],
-      post_logout_redirect_uris: [`${process.env.DISCOURSE_URL.replace(/\/$/, '')}/`], // <== важно
+      post_logout_redirect_uris: [
+        `${process.env.DISCOURSE_URL.replace(/\/$/, '')}/auth/oidc/callback`
+      ],
     },
   ],
   async findAccount(ctx, sub) {
@@ -69,14 +73,14 @@ const configuration = {
     revocation: { enabled: true },
     introspection: { enabled: true },
     userinfo: { enabled: true },
-    rpInitiatedLogout: { enabled: true }, // <== включаем logout
+    rpInitiatedLogout: { enabled: true },
   },
 };
 
 const oidc = new Provider(ISSUER, configuration);
 oidc.proxy = true;
 
-// --- ДИАГНОСТИЧЕСКИЙ ЛОГЕР ---
+// --- Диагностический лог ---
 oidc.app.use(async (ctx, next) => {
   console.log(`[OIDC-REQ] ${ctx.method} ${ctx.path} Cookie=${ctx.headers.cookie || '<none>'}`);
   await next();
