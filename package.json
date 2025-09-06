@@ -2,6 +2,7 @@
   "name": "donate-vite",
   "private": true,
   "version": "0.0.0",
+  "description": "OIDC auth project",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -30,5 +31,9 @@
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.39.0",
     "vite": "^7.1.0"
+  },
+  "resolutions": {
+    "wagmi": "^2.10.10",
+    "viem": "^2.17.4"
   }
 }
