@@ -3,7 +3,7 @@ require('dotenv').config();
 
 const cors = require('@koa/cors');
 const { verifyWallet } = require('./walletAuth');
-const RedisAdapter = require('./redisAdapter'); // ВОЗВРАЩАЕМ REDIS
+const RedisAdapter = require('./redisAdapter'); // Теперь будет работать!
 
 let Provider;
 try {
@@ -22,7 +22,7 @@ if (!ISSUER) {
 }
 
 const configuration = {
-  adapter: RedisAdapter, // ВОЗВРАЩАЕМ REDIS
+  adapter: RedisAdapter,
   clients: [
     {
       client_id: 'discourse_client',
