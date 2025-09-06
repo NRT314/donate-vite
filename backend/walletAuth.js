@@ -1,13 +1,12 @@
 // backend/walletAuth.js
-const { ethers } = require('ethers');
+const { verifyMessage } = require('ethers');
 
 async function verifyWallet(walletAddress, signature, message) {
   try {
-    // Эта функция теперь проверяет подпись для конкретного сообщения
-    const recovered = ethers.verifyMessage(message, signature);
+    const recovered = verifyMessage(message, signature);
     return recovered.toLowerCase() === walletAddress.toLowerCase();
   } catch (err) {
-    console.error('Wallet verification error', err);
+    console.error('Wallet verification error:', err.message);
     return false;
   }
 }
