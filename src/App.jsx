@@ -19,7 +19,6 @@ import CollapsibleCard from './components/CollapsibleCard';
 import VotingPage from './pages/VotingPage';
 import ProposalView from './pages/ProposalView';
 import AdminPage from './pages/AdminPage';
-// import ForumLoginModal from './components/ForumLoginModal'; // <<-- УДАЛЕНО
 import DiscourseAuth from './pages/DiscourseAuth';
 
 const initialAmounts = ORGANIZATIONS.reduce((acc, org) => {
@@ -28,7 +27,7 @@ const initialAmounts = ORGANIZATIONS.reduce((acc, org) => {
 }, {});
 
 
-// --- MAINVIEW COMPONENT (Изменена кнопка "Наш форум") ---
+// --- MAINVIEW COMPONENT ---
 const MainView = ({ t, lang, navigate, ...props }) => {
     const { data: totalDonated, isLoading: isLoadingTotal, isError } = useReadContract({
         address: CONTRACT_ADDRESS,
@@ -175,6 +174,13 @@ const MainView = ({ t, lang, navigate, ...props }) => {
                 >
                     <h2 className="sidebar-card__title">{t.our_forum_title}</h2>
                 </a>
+
+                <a
+                    href="https://forum.newrussia.online/auth/oidc"
+                    className="sidebar-card sidebar-link-section"
+                >
+                    <h2 className="sidebar-card__title">Log in to the forum</h2>
+                </a>
                 {/* <<-- КОНЕЦ ИЗМЕНЕНИЙ -->> */}
 
                 <ContactForm t={t} />
@@ -192,7 +198,6 @@ export default function App() {
     const [donationAmounts, setDonationAmounts] = useState(initialAmounts);
     const [presetAmount, setPresetAmount] = useState('0');
     const [status, setStatus] = useState({ message: '', type: 'idle', hash: null });
-    // const [isForumModalOpen, setForumModalOpen] = useState(false); // <<-- УДАЛЕНО
 
     const t = translationData[lang];
     const navigate = useNavigate();
@@ -308,17 +313,10 @@ export default function App() {
         setPresetAmount(sanitizedValue);
     };
 
-    // <<-- ВСЯ ЛОГИКА МОДАЛЬНОГО ОКНА УДАЛЕНА -->>
-    // const handleAnonymousForumAccess = () => { ... };
-    // const handleLoginToForum = () => { ... };
-
     return (
         <div className="app-container">
             <Header t={t} lang={lang} setLang={setLang} />
             
-            {/* <<-- УДАЛЕНО ОТОБРАЖЕНИЕ МОДАЛЬНОГО ОКНА -->> */}
-            {/* {isForumModalOpen && ( ... )} */}
-
             <Routes>
                 <Route
                     path="/"
@@ -341,7 +339,6 @@ export default function App() {
                             handleDonateClick={handleDonateClick}
                             status={status}
                             chain={chain}
-                            // openForumModal={() => setForumModalOpen(true)} // <<-- УДАЛЕНО
                         />
                     }
                 />
