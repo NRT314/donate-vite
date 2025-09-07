@@ -166,24 +166,21 @@ const MainView = ({ t, lang, navigate, ...props }) => {
                 </div>
 
                 {/* <<-- НАЧАЛО ИЗМЕНЕНИЙ -->> */}
-                <div className="sidebar-card">
-                    <h2 className="sidebar-card__title">{t.our_forum_title}</h2>
-                    <div className="sidebar-card__links">
-                        <a 
-                            href="https://forum.newrussia.online/" 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="sidebar-card__link"
-                        >
-                            {t.forum_link_main || 'Перейти на форум'}
-                        </a>
-                        <a 
-                            href="https://forum.newrussia.online/auth/oidc" 
-                            className="sidebar-card__link"
-                        >
-                            {t.forum_link_login || 'Войти с помощью кошелька'}
-                        </a>
-                    </div>
+                <div className="sidebar-card sidebar-forum-section">
+                    <a
+                        href="https://forum.newrussia.online/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="sidebar-main-link"
+                    >
+                        <h2 className="sidebar-card__title">{t.our_forum_title}</h2>
+                    </a>
+                    <a
+                        href="https://forum.newrussia.online/auth/oidc"
+                        className="sidebar-secondary-link"
+                    >
+                        login to the forum
+                    </a>
                 </div>
                 {/* <<-- КОНЕЦ ИЗМЕНЕНИЙ -->> */}
 
