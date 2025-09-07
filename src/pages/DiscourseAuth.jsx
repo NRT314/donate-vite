@@ -27,6 +27,7 @@ export default function DiscourseAuth() {
     return connectors.find((c) => c.ready) || connectors[0]
   }, [connectors])
 
+  // Utility: wait until condition is true or timeout
   const waitFor = async (fn, timeoutMs = 5000, intervalMs = 100) => {
     const start = Date.now()
     while (!fn() && Date.now() - start < timeoutMs) {
@@ -37,12 +38,6 @@ export default function DiscourseAuth() {
 
   const runAuthentication = async () => {
     try {
-      // Обработка выхода
-      if (searchParams.get('post_logout_redirect_uri')) {
-        setStatusText('Вы успешно вышли из системы.')
-        return
-      }
-
       if (!uid) {
         setStatusText('Ошибка: UID сессии не найден.')
         return
@@ -50,21 +45,25 @@ export default function DiscourseAuth() {
 
       setStatusText('Подготовка к подключению кошелька...')
 
-      if (!connectors?.length) {
-        setStatusText('Пожалуйста, подключите кошелек.')
+      if (!connectors || !connectors.length) {
+        setStatusText('Кошельки не найдены.')
         return
       }
 
       let currentAddress = address
 
-      // Если есть уже подключенный кошелек — используем его
-      if (!currentAddress && isConnected) {
-        setStatusText('Обнаружена активная сессия кошелька...')
-        await waitFor(() => address, 3000)
-        currentAddress = address
+      // Если подключение "битое" — сразу сбрасываем
+      if (isConnected && !currentAddress) {
+        setStatusText('Сбрасываем старую сессию кошелька...')
+        try {
+          await disconnect()
+          await waitFor(() => !isConnected, 5000)
+        } catch (e) {
+          console.warn('Disconnect failed:', e?.message)
+        }
       }
 
-      // Подключение, если кошелек не найден
+      // Подключение
       if (!currentAddress) {
         const candidates = [
           preferredConnector,
@@ -76,29 +75,44 @@ export default function DiscourseAuth() {
           try {
             setStatusText(`Подключаем ${cand.name || cand.id}...`)
             const result = await connectAsync({ connector: cand })
-            currentAddress = result?.account || result?.accounts?.[0] || null
+            currentAddress =
+              result?.account || result?.accounts?.[0] || null
             if (!currentAddress) {
               await waitFor(() => address, 3000)
               currentAddress = address
             }
             if (currentAddress) break
           } catch (err) {
-            console.warn('Connect failed for', cand?.name || cand?.id, err)
+            console.warn(
+              'Connect failed for',
+              cand?.name || cand?.id,
+              err?.message || err
+            )
+
+            // Автофикс бага getChainId
+            if (
+              err?.message?.includes('getChainId') ||
+              err?.toString()?.includes('getChainId')
+            ) {
+              console.log('Detected getChainId bug → resetting connector')
+              await disconnect()
+              await waitFor(() => !isConnected, 3000)
+            }
           }
         }
       }
 
       if (!currentAddress) {
-        setStatusText('Пожалуйста, подключите кошелек.')
+        setStatusText('Подключите, пожалуйста, кошелёк.')
         return
       }
 
       // Подпись
-      setStatusText('Пожалуйста, подпишите сообщение для входа...')
+      setStatusText('Пожалуйста, подпишите сообщение в кошельке...')
       const message = `Sign this message to login to the forum: ${uid}`
       const signature = await signMessageAsync({ message })
 
-      setStatusText('Проверка подписи и вход в систему...')
+      setStatusText('Проверка подписи и вход...')
 
       // Отправка формы на сервер
       const form = document.createElement('form')
@@ -121,16 +135,30 @@ export default function DiscourseAuth() {
       form.submit()
     } catch (err) {
       console.error('Ошибка аутентификации:', err)
+
+      // Автоматический повтор при баге getChainId
+      if (
+        err?.message?.includes('getChainId') ||
+        err?.toString()?.includes('getChainId')
+      ) {
+        setStatusText('Обнаружена ошибка соединения, пробуем ещё раз...')
+        await disconnect()
+        setTimeout(() => setRetryKey((k) => k + 1), 500)
+        return
+      }
+
       setStatusText(
         `Ошибка: ${err?.shortMessage || err?.message || String(err)}`
       )
     }
   }
 
+  // Основной эффект
   useEffect(() => {
     if (uid && connectors?.length) {
       runAuthentication()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid, connectors, address, retryKey])
 
   return (
