@@ -49,19 +49,6 @@ export default function DiscourseAuth() {
 
         setStatusText('Подготовка к подключению кошелька...')
 
-        // Если уже есть подключение, отключаемся прежде чем подключаться заново
-        if (isConnected) {
-          setStatusText('Отключаем старую сессию кошелька...')
-          try {
-            await disconnect()
-            // Даем состояние обновиться (проверяем через poll)
-            await waitForDisconnected(5000)
-          } catch (e) {
-            // Если не удалось отключиться — логируем, но продолжаем попытки подключиться заново
-            console.warn('Disconnect failed or timed out:', e && e.message)
-          }
-        }
-
         // Убедимся, что есть доступные коннекторы
         if (!connectors || connectors.length === 0) {
           setStatusText('Кошельки не найдены.')
@@ -83,14 +70,14 @@ export default function DiscourseAuth() {
               // В большинстве версий wagmi result.account или result?.accounts[0]
               const acc =
                 result?.account || result?.accounts?.[0] || (await (async () => {
-                  // если connectAsync не вернул адрес — берем address из useAccount (он должен обновиться)
-                  const start = Date.now()
-                  while (!address && Date.now() - start < 3000) {
-                    // eslint-disable-next-line no-await-in-loop
-                    await new Promise((r) => setTimeout(r, 100))
-                  }
-                  return address
-                })())
+                    // если connectAsync не вернул адрес — берем address из useAccount (он должен обновиться)
+                    const start = Date.now()
+                    while (!address && Date.now() - start < 3000) {
+                      // eslint-disable-next-line no-await-in-loop
+                      await new Promise((r) => setTimeout(r, 100))
+                    }
+                    return address
+                  })())
               if (acc) return acc
             } catch (err) {
               console.warn('connect candidate failed:', cand?.id || cand?.name, err && err.message)
@@ -102,9 +89,20 @@ export default function DiscourseAuth() {
 
         let currentAddress = address
         if (!currentAddress) {
+          // Только если адреса нет — сбрасываем старую сессию
+          if (isConnected) {
+            setStatusText('Отключаем старую сессию кошелька...')
+            try {
+              await disconnect()
+              await waitForDisconnected(5000)
+            } catch (e) {
+              console.warn('Disconnect failed:', e?.message)
+            }
+          }
+
+          // И уже потом пробуем коннект
           currentAddress = await tryConnect()
         }
-
         if (!currentAddress) {
           throw new Error('Не удалось подключить кошелек.')
         }
