@@ -27,7 +27,6 @@ export default function DiscourseAuth() {
     return connectors.find((c) => c.ready) || connectors[0]
   }, [connectors])
 
-  // Utility: wait until condition is true or timeout
   const waitFor = async (fn, timeoutMs = 5000, intervalMs = 100) => {
     const start = Date.now()
     while (!fn() && Date.now() - start < timeoutMs) {
@@ -38,9 +37,8 @@ export default function DiscourseAuth() {
 
   const runAuthentication = async () => {
     try {
-      // Проверяем, был ли выход
-      const postLogout = searchParams.get('post_logout_redirect_uri')
-      if (postLogout) {
+      // Обработка выхода
+      if (searchParams.get('post_logout_redirect_uri')) {
         setStatusText('Вы успешно вышли из системы.')
         return
       }
@@ -52,25 +50,21 @@ export default function DiscourseAuth() {
 
       setStatusText('Подготовка к подключению кошелька...')
 
-      if (!connectors || !connectors.length) {
+      if (!connectors?.length) {
         setStatusText('Пожалуйста, подключите кошелек.')
         return
       }
 
       let currentAddress = address
 
-      // Если уже подключен другой кошелек — отключаем
-      if (isConnected && !currentAddress) {
-        setStatusText('Отключаем старую сессию кошелька...')
-        try {
-          await disconnect()
-          await waitFor(() => !isConnected, 5000)
-        } catch (e) {
-          console.warn('Disconnect failed:', e?.message)
-        }
+      // Если есть уже подключенный кошелек — используем его
+      if (!currentAddress && isConnected) {
+        setStatusText('Обнаружена активная сессия кошелька...')
+        await waitFor(() => address, 3000)
+        currentAddress = address
       }
 
-      // Подключение
+      // Подключение, если кошелек не найден
       if (!currentAddress) {
         const candidates = [
           preferredConnector,
@@ -82,8 +76,7 @@ export default function DiscourseAuth() {
           try {
             setStatusText(`Подключаем ${cand.name || cand.id}...`)
             const result = await connectAsync({ connector: cand })
-            currentAddress =
-              result?.account || result?.accounts?.[0] || null
+            currentAddress = result?.account || result?.accounts?.[0] || null
             if (!currentAddress) {
               await waitFor(() => address, 3000)
               currentAddress = address
@@ -101,11 +94,11 @@ export default function DiscourseAuth() {
       }
 
       // Подпись
-      setStatusText('Пожалуйста, подпишите сообщение в кошельке...')
+      setStatusText('Пожалуйста, подпишите сообщение для входа...')
       const message = `Sign this message to login to the forum: ${uid}`
       const signature = await signMessageAsync({ message })
 
-      setStatusText('Проверка подписи и вход...')
+      setStatusText('Проверка подписи и вход в систему...')
 
       // Отправка формы на сервер
       const form = document.createElement('form')
