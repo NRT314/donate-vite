@@ -1,9 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useAccount, useConnect, useSignMessage } from 'wagmi'
-
-// ===== НАШ ДИАГНОСТИЧЕСКИЙ ЛОГ =====
-console.log('DiscourseAuth.jsx component code loaded. Version: WAGMI V2')
+import { useAccount, useConnect, useSignMessage, useDisconnect } from 'wagmi'
 
 const OIDC_SERVER_URL =
   import.meta.env.VITE_OIDC_SERVER_URL ||
@@ -15,6 +12,7 @@ export default function DiscourseAuth() {
   const [statusText, setStatusText] = useState('Инициализация...')
 
   const { address, isConnected } = useAccount()
+  const { disconnect } = useDisconnect()
   const { connectors, connectAsync, isPending: isConnecting } = useConnect()
   const { signMessageAsync, isPending: isSigning } = useSignMessage()
 
@@ -22,11 +20,6 @@ export default function DiscourseAuth() {
   const preferredConnector = useMemo(() => {
     if (!connectors?.length) return undefined
     return connectors.find((c) => c.ready) || connectors[0]
-  }, [connectors])
-
-  // Логируем для отладки
-  useEffect(() => {
-    console.log('Available connectors:', connectors)
   }, [connectors])
 
   useEffect(() => {
@@ -39,13 +32,19 @@ export default function DiscourseAuth() {
 
         let currentAddress = address
 
-        if (!isConnected) {
-          setStatusText('Подключаем кошелек...')
-          if (!preferredConnector) {
-            setStatusText('Кошельки не найдены.')
-            return
-          }
+        // Если есть старое соединение — отключаем перед новым
+        if (isConnected) {
+          console.log('Disconnecting previous wallet session...')
+          await disconnect()
+        }
 
+        if (!preferredConnector) {
+          setStatusText('Кошельки не найдены.')
+          return
+        }
+
+        if (!currentAddress) {
+          setStatusText('Подключаем кошелек...')
           const result = await connectAsync({ connector: preferredConnector })
           currentAddress = result?.accounts?.[0]
         }
@@ -94,6 +93,7 @@ export default function DiscourseAuth() {
     connectors,
     connectAsync,
     signMessageAsync,
+    disconnect,
     isConnecting,
     isSigning,
     preferredConnector,
@@ -107,17 +107,6 @@ export default function DiscourseAuth() {
         fontFamily: 'sans-serif',
       }}
     >
-      {/* ===== НАШ ВИЗУАЛЬНЫЙ "МАЯЧОК" ===== */}
-      <h1
-        style={{
-          color: 'red',
-          fontWeight: 'bold',
-          border: '2px solid red',
-          padding: '10px',
-        }}
-      >
-        ТЕСТ: ЗАГРУЖЕН КОД WAGMI V2
-      </h1>
       <h2>Аутентификация для форума</h2>
       <p style={{ fontSize: '18px', minHeight: '30px' }}>{statusText}</p>
     </div>
