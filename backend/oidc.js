@@ -22,6 +22,9 @@ if (!ISSUER) {
   process.exit(1);
 }
 
+const DISCOURSE_URL = (process.env.DISCOURSE_URL || '').replace(/\/$/, '');
+const NEWRUSSIA_URL = 'https://newrussia.online';
+
 const configuration = {
   adapter: RedisAdapter,
   clients: [
@@ -29,12 +32,15 @@ const configuration = {
       client_id: 'discourse_client',
       client_secret: process.env.OIDC_CLIENT_SECRET,
       redirect_uris: [
-        `${process.env.DISCOURSE_URL.replace(/\/$/, '')}/auth/oidc/callback`
+        `${DISCOURSE_URL}/auth/oidc/callback`
       ],
       grant_types: ['authorization_code'],
       response_types: ['code'],
+      // Добавляем несколько допустимых post_logout_redirect_uri — запасной вариант и callback,
+      // чтобы покрыть разные реализации в Discourse/браузерах.
       post_logout_redirect_uris: [
-        `${process.env.DISCOURSE_URL.replace(/\/$/, '')}/auth/oidc/callback`
+        `${DISCOURSE_URL}/auth/oidc/callback`,
+        `${DISCOURSE_URL}/`
       ],
     },
   ],
@@ -55,7 +61,8 @@ const configuration = {
   },
   interactions: {
     url(ctx, interaction) {
-      return `https://newrussia.online/discourse-auth?uid=${interaction.uid}`;
+      // возвращаем UI для подписи / входа
+      return `${NEWRUSSIA_URL}/discourse-auth?uid=${interaction.uid}`;
     },
   },
   cookies: {
@@ -73,21 +80,53 @@ const configuration = {
     revocation: { enabled: true },
     introspection: { enabled: true },
     userinfo: { enabled: true },
-    rpInitiatedLogout: { enabled: true },
+    rpInitiatedLogout: { enabled: true }, // включаем RP-инициированный logout
   },
 };
 
 const oidc = new Provider(ISSUER, configuration);
 oidc.proxy = true;
 
-// --- Диагностический лог ---
+/**
+ * Диагностический лог — общий
+ */
 oidc.app.use(async (ctx, next) => {
   console.log(`[OIDC-REQ] ${ctx.method} ${ctx.path} Cookie=${ctx.headers.cookie || '<none>'}`);
   await next();
 });
 
-oidc.app.use(cors({ origin: 'https://newrussia.online', credentials: true }));
+/**
+ * Специальный лог и очистка куки при запросе logout (/session/end).
+ * Мы не заменяем поведение oidc-provider — просто логируем и пытаемся удалить локальные куки,
+ * чтобы браузер не держал старую сессию.
+ */
+oidc.app.use(async (ctx, next) => {
+  if (ctx.path === '/session/end' || ctx.path === '/session/end/') {
+    console.log('[OIDC-LOGOUT] request to /session/end, query:', ctx.query);
 
+    try {
+      // Попытка удалить куки, которые oidc-provider использует для сессии/interaction.
+      // Это поможет браузеру "забыть" сессию до того, как oidc-provider сделает редирект.
+      // Указываем опции, соответствующие созданию cookie в конфиге.
+      ctx.cookies.set('_interaction', '', { httpOnly: true, signed: false, sameSite: 'none', secure: true, path: '/', expires: new Date(0) });
+      ctx.cookies.set('_interaction.sig', '', { httpOnly: true, signed: false, sameSite: 'none', secure: true, path: '/', expires: new Date(0) });
+      ctx.cookies.set('_session', '', { httpOnly: true, signed: false, sameSite: 'none', secure: true, path: '/', expires: new Date(0) });
+      ctx.cookies.set('_session.sig', '', { httpOnly: true, signed: false, sameSite: 'none', secure: true, path: '/', expires: new Date(0) });
+
+      // Логируем текущее значение cookie (для отладки только — не в проде)
+      console.log('[OIDC-LOGOUT] cookies cleared attempt');
+    } catch (e) {
+      console.warn('[OIDC-LOGOUT] failed to clear cookies locally:', e && e.message);
+    }
+  }
+  await next();
+});
+
+oidc.app.use(cors({ origin: NEWRUSSIA_URL, credentials: true }));
+
+/**
+ * bodyParser только для /wallet-callback
+ */
 const conditionalBodyParser = bodyParser({ enableTypes: ['json', 'form'] });
 oidc.app.use(async (ctx, next) => {
   if (ctx.path.endsWith('/wallet-callback')) {
@@ -97,7 +136,9 @@ oidc.app.use(async (ctx, next) => {
   }
 });
 
-// Кастомный wallet-callback
+/**
+ * Кастомный wallet-callback — верификация подписи и завершение интеракции.
+ */
 oidc.app.use(async (ctx, next) => {
   if (!(ctx.path.endsWith('/wallet-callback') && ctx.method === 'POST')) {
     return await next();
@@ -120,9 +161,9 @@ oidc.app.use(async (ctx, next) => {
       details = await oidc.interactionDetails(ctx.req, ctx.res);
       console.log('[OIDC] interactionDetails(req,res) succeeded, uid=', details?.uid);
     } catch (e) {
-      console.error('[OIDC] interactionDetails failed:', e.message);
+      console.error('[OIDC] interactionDetails failed:', e && e.message);
       ctx.status = 500;
-      ctx.body = { error: 'interactionDetails failed', details: e.message };
+      ctx.body = { error: 'interactionDetails failed', details: e && e.message };
       return;
     }
 
@@ -144,17 +185,20 @@ oidc.app.use(async (ctx, next) => {
 
     const accountId = walletAddress.toLowerCase();
     const result = { login: { accountId } };
+
+    // Создаём grant и даём запрошенные scope'ы
     const grant = new oidc.Grant({ accountId, clientId: details.params.client_id });
     grant.addOIDCScope('openid email profile');
     result.consent = { grantId: await grant.save() };
     console.log('[OIDC] Grant created, grantId:', grant.grantId);
 
+    // Завершаем интеракцию у oidc-provider — он сделает редирект на client redirect_uri
     await oidc.interactionFinished(ctx.req, ctx.res, result, { mergeWithLastSubmission: false });
     console.log('[OIDC] interactionFinished successfully.');
   } catch (err) {
-    console.error('[OIDC] Unexpected error in /wallet-callback:', err);
+    console.error('[OIDC] Unexpected error in /wallet-callback:', err && err.stack ? err.stack : err);
     ctx.status = err.statusCode || 500;
-    ctx.body = { error: 'Internal server error', details: err.message };
+    ctx.body = { error: 'Internal server error', details: err && err.message };
   }
 });
 
