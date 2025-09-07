@@ -15,161 +15,136 @@ export default function DiscourseAuth() {
   const [searchParams] = useSearchParams()
   const uid = searchParams.get('uid')
   const [statusText, setStatusText] = useState('Инициализация...')
+  const [retryKey, setRetryKey] = useState(0) // для повторной попытки подписи
 
   const { address, isConnected } = useAccount()
   const { disconnect } = useDisconnect()
-  const { connectors, connectAsync, isPending: isConnecting } = useConnect()
-  const { signMessageAsync, isPending: isSigning } = useSignMessage()
+  const { connectors, connectAsync } = useConnect()
+  const { signMessageAsync } = useSignMessage()
 
-  // Берём первый "готовый" коннектор (или первый в списке)
   const preferredConnector = useMemo(() => {
     if (!connectors?.length) return undefined
     return connectors.find((c) => c.ready) || connectors[0]
   }, [connectors])
 
-  // Утилита: дождаться isConnected === false (с таймаутом)
-  const waitForDisconnected = async (timeoutMs = 5000) => {
+  // Utility: wait until condition is true or timeout
+  const waitFor = async (fn, timeoutMs = 5000, intervalMs = 100) => {
     const start = Date.now()
-    while (isConnected && Date.now() - start < timeoutMs) {
-      // eslint-disable-next-line no-await-in-loop
-      await new Promise((r) => setTimeout(r, 100))
+    while (!fn() && Date.now() - start < timeoutMs) {
+      await new Promise((r) => setTimeout(r, intervalMs))
     }
-    return !isConnected
+    return fn()
   }
 
-  useEffect(() => {
-    let cancelled = false
-
-    const runAuthentication = async () => {
-      try {
-        if (!uid) {
-          setStatusText('Ошибка: UID сессии не найден.')
-          return
-        }
-
-        setStatusText('Подготовка к подключению кошелька...')
-
-        // Убедимся, что есть доступные коннекторы
-        if (!connectors || connectors.length === 0) {
-          setStatusText('Кошельки не найдены.')
-          return
-        }
-
-        // Попытка подключения: пробуем preferredConnector, затем любой ready, затем первый.
-        const tryConnect = async () => {
-          const candidates = [
-            preferredConnector,
-            ...connectors.filter((c) => c.ready && c !== preferredConnector),
-            connectors[0],
-          ].filter(Boolean)
-
-          for (const cand of candidates) {
-            try {
-              setStatusText(`Подключаем ${cand.name || cand.id}...`)
-              const result = await connectAsync({ connector: cand })
-              // В большинстве версий wagmi result.account или result?.accounts[0]
-              const acc =
-                result?.account || result?.accounts?.[0] || (await (async () => {
-                    // если connectAsync не вернул адрес — берем address из useAccount (он должен обновиться)
-                    const start = Date.now()
-                    while (!address && Date.now() - start < 3000) {
-                      // eslint-disable-next-line no-await-in-loop
-                      await new Promise((r) => setTimeout(r, 100))
-                    }
-                    return address
-                  })())
-              if (acc) return acc
-            } catch (err) {
-              console.warn('connect candidate failed:', cand?.id || cand?.name, err && err.message)
-              // пробуем следующий кандидат
-            }
-          }
-          return null
-        }
-
-        let currentAddress = address
-        if (!currentAddress) {
-          // Только если адреса нет — сбрасываем старую сессию
-          if (isConnected) {
-            setStatusText('Отключаем старую сессию кошелька...')
-            try {
-              await disconnect()
-              await waitForDisconnected(5000)
-            } catch (e) {
-              console.warn('Disconnect failed:', e?.message)
-            }
-          }
-
-          // И уже потом пробуем коннект
-          currentAddress = await tryConnect()
-        }
-        if (!currentAddress) {
-          throw new Error('Не удалось подключить кошелек.')
-        }
-
-        setStatusText('Пожалуйста, подпишите сообщение в кошельке...')
-        const message = `Sign this message to login to the forum: ${uid}`
-
-        // Подпись
-        const signature = await signMessageAsync({ message })
-
-        setStatusText('Проверка подписи...')
-
-        // Отправляем форму (редирект)
-        const form = document.createElement('form')
-        form.method = 'POST'
-        form.action = `${OIDC_SERVER_URL}/oidc/wallet-callback`
-
-        const createInput = (name, value) => {
-          const input = document.createElement('input')
-          input.type = 'hidden'
-          input.name = name
-          input.value = value
-          form.appendChild(input)
-        }
-
-        createInput('uid', uid)
-        createInput('walletAddress', currentAddress)
-        createInput('signature', signature)
-
-        document.body.appendChild(form)
-        form.submit()
-      } catch (err) {
-        console.error('Ошибка аутентификации:', err)
-        setStatusText(`Ошибка: ${err?.shortMessage || err?.message || String(err)}`)
+  const runAuthentication = async () => {
+    try {
+      if (!uid) {
+        setStatusText('Ошибка: UID сессии не найден.')
+        return
       }
-    }
 
-    if (uid && connectors && !isConnecting && !isSigning && !cancelled) {
+      setStatusText('Подготовка к подключению кошелька...')
+
+      if (!connectors || !connectors.length) {
+        setStatusText('Кошельки не найдены.')
+        return
+      }
+
+      let currentAddress = address
+
+      // Если уже подключен другой кошелёк — отключаем
+      if (isConnected && !currentAddress) {
+        setStatusText('Отключаем старую сессию кошелька...')
+        try {
+          await disconnect()
+          await waitFor(() => !isConnected, 5000)
+        } catch (e) {
+          console.warn('Disconnect failed:', e?.message)
+        }
+      }
+
+      // Подключение
+      if (!currentAddress) {
+        const candidates = [
+          preferredConnector,
+          ...connectors.filter((c) => c.ready && c !== preferredConnector),
+          connectors[0],
+        ].filter(Boolean)
+
+        for (const cand of candidates) {
+          try {
+            setStatusText(`Подключаем ${cand.name || cand.id}...`)
+            const result = await connectAsync({ connector: cand })
+            currentAddress =
+              result?.account || result?.accounts?.[0] || null
+            if (!currentAddress) {
+              await waitFor(() => address, 3000)
+              currentAddress = address
+            }
+            if (currentAddress) break
+          } catch (err) {
+            console.warn('Connect failed for', cand?.name || cand?.id, err)
+          }
+        }
+      }
+
+      if (!currentAddress) {
+        throw new Error('Не удалось подключить кошелек.')
+      }
+
+      // Подпись
+      setStatusText('Пожалуйста, подпишите сообщение в кошельке...')
+      const message = `Sign this message to login to the forum: ${uid}`
+      const signature = await signMessageAsync({ message })
+
+      setStatusText('Проверка подписи и вход...')
+
+      // Отправка формы на сервер
+      const form = document.createElement('form')
+      form.method = 'POST'
+      form.action = `${OIDC_SERVER_URL}/oidc/wallet-callback`
+
+      const createInput = (name, value) => {
+        const input = document.createElement('input')
+        input.type = 'hidden'
+        input.name = name
+        input.value = value
+        form.appendChild(input)
+      }
+
+      createInput('uid', uid)
+      createInput('walletAddress', currentAddress)
+      createInput('signature', signature)
+
+      document.body.appendChild(form)
+      form.submit()
+    } catch (err) {
+      console.error('Ошибка аутентификации:', err)
+      setStatusText(
+        `Ошибка: ${err?.shortMessage || err?.message || String(err)}`
+      )
+    }
+  }
+
+  // Основной эффект
+  useEffect(() => {
+    if (uid && connectors?.length) {
       runAuthentication()
     }
-
-    return () => {
-      cancelled = true
-    }
-  }, [
-    uid,
-    address,
-    isConnected,
-    connectors,
-    connectAsync,
-    signMessageAsync,
-    disconnect,
-    isConnecting,
-    isSigning,
-    preferredConnector,
-  ])
+  }, [uid, connectors, address, retryKey])
 
   return (
-    <div
-      style={{
-        padding: '2rem',
-        textAlign: 'center',
-        fontFamily: 'sans-serif',
-      }}
-    >
+    <div style={{ padding: '2rem', textAlign: 'center', fontFamily: 'sans-serif' }}>
       <h2>Аутентификация для форума</h2>
       <p style={{ fontSize: '18px', minHeight: '30px' }}>{statusText}</p>
+      {statusText.startsWith('Ошибка') && (
+        <button
+          style={{ marginTop: '1rem', padding: '0.5rem 1rem', cursor: 'pointer' }}
+          onClick={() => setRetryKey((k) => k + 1)}
+        >
+          Попробовать снова
+        </button>
+      )}
     </div>
   )
 }
