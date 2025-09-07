@@ -15,7 +15,7 @@ export default function DiscourseAuth() {
   const [searchParams] = useSearchParams()
   const uid = searchParams.get('uid')
   const [statusText, setStatusText] = useState('Инициализация...')
-  const [retryKey, setRetryKey] = useState(0) // для повторной попытки подписи
+  const [retryKey, setRetryKey] = useState(0)
 
   const { address, isConnected } = useAccount()
   const { disconnect } = useDisconnect()
@@ -38,6 +38,13 @@ export default function DiscourseAuth() {
 
   const runAuthentication = async () => {
     try {
+      // Проверяем, был ли выход
+      const postLogout = searchParams.get('post_logout_redirect_uri')
+      if (postLogout) {
+        setStatusText('Вы успешно вышли из системы.')
+        return
+      }
+
       if (!uid) {
         setStatusText('Ошибка: UID сессии не найден.')
         return
@@ -46,13 +53,13 @@ export default function DiscourseAuth() {
       setStatusText('Подготовка к подключению кошелька...')
 
       if (!connectors || !connectors.length) {
-        setStatusText('Кошельки не найдены.')
+        setStatusText('Пожалуйста, подключите кошелек.')
         return
       }
 
       let currentAddress = address
 
-      // Если уже подключен другой кошелёк — отключаем
+      // Если уже подключен другой кошелек — отключаем
       if (isConnected && !currentAddress) {
         setStatusText('Отключаем старую сессию кошелька...')
         try {
@@ -89,7 +96,8 @@ export default function DiscourseAuth() {
       }
 
       if (!currentAddress) {
-        throw new Error('Не удалось подключить кошелек.')
+        setStatusText('Пожалуйста, подключите кошелек.')
+        return
       }
 
       // Подпись
@@ -126,7 +134,6 @@ export default function DiscourseAuth() {
     }
   }
 
-  // Основной эффект
   useEffect(() => {
     if (uid && connectors?.length) {
       runAuthentication()
