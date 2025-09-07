@@ -9,12 +9,19 @@ const port = process.env.PORT || 10000;
 
 app.set('trust proxy', 1);
 
-// --- ДИАГНОСТИЧЕСКИЙ ЛОГЕР (рекомендация специалиста) ---
+// --- ДИАГНОСТИЧЕСКИЙ ЛОГЕР ---
 app.use((req, res, next) => {
-  console.log(`[EXPRESS] ${new Date().toISOString()} ${req.method} ${req.originalUrl} Referer:${req.headers.referer || '<none>'}`);
+  console.log(
+    `[EXPRESS] ${new Date().toISOString()} ${req.method} ${req.originalUrl} Referer:${req.headers.referer || '<none>'}`
+  );
   next();
 });
-// ---------------------------------------------------------
+
+// --- HEALTHCHECK ---
+app.get('/healthz', (req, res) => {
+  res.status(200).send('OK');
+});
+// --------------------
 
 app.use('/oidc', oidc.callback());
 
