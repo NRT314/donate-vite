@@ -8,12 +8,12 @@ export default function About({ t }) {
           <p dangerouslySetInnerHTML={{ __html: t.about_section_idea_text }}></p>
         </div>
         <div>
-          <h3 style={{ fontWeight: '600' }}>{t.about_section_why_polygon_title}</h3>
-          <p dangerouslySetInnerHTML={{ __html: t.about_section_why_polygon_text }}></p>
-        </div>
-        <div>
           <h3 style={{ fontWeight: '600' }}>{t.about_section_what_is_nrt_title}</h3>
           <p dangerouslySetInnerHTML={{ __html: t.about_section_what_is_nrt_text }}></p>
+        </div>
+        <div>
+          <h3 style={{ fontWeight: '600' }}>{t.about_section_why_nrt_title}</h3>
+          <p dangerouslySetInnerHTML={{ __html: t.about_section_why_nrt_text }}></p>
         </div>
       </div>
     </section>

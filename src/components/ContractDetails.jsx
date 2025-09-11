@@ -3,37 +3,25 @@ export default function ContractDetails({ t, onBack }) {
 
   return (
     <div className="details-page-container">
-      <h1>{pageContent.title}</h1>
+      <h1>
+        <a
+          href="/whitepaper.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            color: 'inherit',
+            textDecoration: 'underline'
+          }}
+        >
+          {pageContent.title} 📄
+        </a>
+      </h1>
 
       <div>
+        {/* --- СЕКЦИЯ 1: КОНТРАКТ ПОЖЕРТВОВАНИЙ --- */}
+        <h2>{pageContent.donations_contract_title}</h2>
         <p>{pageContent.intro_p1}</p>
         <p>{pageContent.intro_p2}</p>
-
-        {/* --- БЛОК С ССЫЛКОЙ НА WHITEPAPER --- */}
-        <div style={{
-          margin: '2rem 0',
-          padding: '1rem',
-          backgroundColor: '#f9fafb',
-          border: '1px solid #e5e7eb',
-          borderRadius: '8px',
-          textAlign: 'center'
-        }}>
-          <a
-            href="/whitepaper.pdf"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              color: '#1d4ed8',
-              fontWeight: '600',
-              textDecoration: 'underline'
-            }}
-          >
-            📄 WhitePaper
-          </a>
-        </div>
-        {/* ------------------------------------ */}
-
-        <h2>{pageContent.core_components_title}</h2>
 
         <h3>{pageContent.nrt_token_title}</h3>
         <ul>
@@ -62,13 +50,37 @@ export default function ContractDetails({ t, onBack }) {
             <li><b>{pageContent.whitelists_li2_strong}</b> {pageContent.whitelists_li2_text}</li>
         </ul>
 
-        <h2>{pageContent.security_title}</h2>
+        <h3>{pageContent.security_title}</h3>
         <p>{pageContent.security_p1}</p>
         <ul>
           <li>✅ <b>{pageContent.security_li1_strong}</b> {pageContent.security_li1_text}</li>
           <li>✅ <b>{pageContent.security_li2_strong}</b> {pageContent.security_li2_text}</li>
           <li>✅ <b>{pageContent.security_li3_strong}</b> {pageContent.security_li3_text}</li>
         </ul>
+
+        <hr style={{margin: '2rem 0'}} />
+
+        {/* --- СЕКЦИЯ 2: КОНТРАКТ ГОЛОСОВАНИЯ --- */}
+        <h2>{pageContent.nrtvoting_section_title}</h2>
+        <p>{pageContent.nrtvoting_intro}</p>
+        
+        <h3>{pageContent.nrtvoting_mechanisms_title}</h3>
+        <p>{pageContent.nrtvoting_mechanisms_intro}</p>
+        <ul>
+            <li><b>{pageContent.nrtvoting_mechanisms_cumulative_strong}</b> {pageContent.nrtvoting_mechanisms_cumulative_text}</li>
+            <li><b>{pageContent.nrtvoting_mechanisms_single_strong}</b> {pageContent.nrtvoting_mechanisms_single_text}</li>
+        </ul>
+
+        <h3>{pageContent.nrtvoting_lifecycle_title}</h3>
+        <p>{pageContent.nrtvoting_lifecycle_intro}</p>
+        <ul>
+            <li><b>{pageContent.nrtvoting_lifecycle_creation_strong}</b> {pageContent.nrtvoting_lifecycle_creation_text}</li>
+            <li><b>{pageContent.nrtvoting_lifecycle_execution_strong}</b> {pageContent.nrtvoting_lifecycle_execution_text}</li>
+        </ul>
+
+        <h3>{pageContent.nrtvoting_tech_title}</h3>
+        <p>{pageContent.nrtvoting_tech_text}</p>
+
       </div>
       <div style={{marginTop: '2rem', paddingTop: '1rem', borderTop: '1px solid #eee', textAlign: 'center'}}>
         <button onClick={onBack} style={{color: '#2563eb', textDecoration: 'underline'}}>

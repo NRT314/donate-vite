@@ -15,7 +15,7 @@ import Footer from './components/Footer';
 import Faq from './components/Faq';
 import ContactForm from './components/ContactForm';
 import ContractDetails from './components/ContractDetails';
-import CollapsibleCard from './components/CollapsibleCard';
+import About from './components/About';
 import VotingPage from './pages/VotingPage';
 import ProposalView from './pages/ProposalView';
 import AdminPage from './pages/AdminPage';
@@ -56,22 +56,8 @@ const MainView = ({ t, lang, navigate, ...props }) => {
                     </p>
                 </div>
 
-                <CollapsibleCard title={t.about_title}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.875rem' }}>
-                        <div>
-                            <h3 style={{ fontWeight: '600' }}>{t.about_section_idea_title}</h3>
-                            <p dangerouslySetInnerHTML={{ __html: t.about_section_idea_text }}></p>
-                        </div>
-                        <div>
-                            <h3 style={{ fontWeight: '600' }}>{t.about_section_why_polygon_title}</h3>
-                            <p dangerouslySetInnerHTML={{ __html: t.about_section_why_polygon_text }}></p>
-                        </div>
-                        <div>
-                            <h3 style={{ fontWeight: '600' }}>{t.about_section_what_is_nrt_title}</h3>
-                            <p dangerouslySetInnerHTML={{ __html: t.about_section_what_is_nrt_text }}></p>
-                        </div>
-                    </div>
-                </CollapsibleCard>
+                <About t={t} />
+
                 <div
                     className="sidebar-card sidebar-link-section"
                     onClick={() => navigate('/contract-details')}
@@ -79,7 +65,6 @@ const MainView = ({ t, lang, navigate, ...props }) => {
                 >
                     <h2 className="sidebar-card__title">{t.how_contract_works_title}</h2>
                 </div>
-                <Faq t={t} />
             </aside>
             <main className="main-column">
                 <div className="card card--center-text">
@@ -164,8 +149,6 @@ const MainView = ({ t, lang, navigate, ...props }) => {
                 >
                     <h2 className="sidebar-card__title">{t.use_nrt_for_voting}</h2>
                 </div>
-
-                {/* <<-- НАЧАЛО ИЗМЕНЕНИЙ -->> */}
                 <div className="sidebar-card sidebar-forum-section">
                     <a
                         href="https://forum.newrussia.online/"
@@ -177,13 +160,13 @@ const MainView = ({ t, lang, navigate, ...props }) => {
                     </a>
                     <a
                         href="https://forum.newrussia.online/auth/oidc"
-                        className="sidebar-secondary-link"
+                        className="sidebar-card__title sidebar-secondary-link"
+                        style={{ fontSize: '1rem', textDecoration: 'underline' }}
                     >
-                        login to the forum
+                        {t.forum_login_link}
                     </a>
                 </div>
-                {/* <<-- КОНЕЦ ИЗМЕНЕНИЙ -->> */}
-
+                <Faq t={t} />
                 <ContactForm t={t} />
             </aside>
         </div>
