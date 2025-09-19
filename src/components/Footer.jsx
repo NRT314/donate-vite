@@ -3,10 +3,11 @@ export default function Footer({ t }) {
   return (
     <footer className="footer">
       <p>
-        <b>{t.technical_details_title}</b>:
-        {' '}{t.technical_details_network},{' '}
-        {t.technical_details_contract}: <a href={`https://polygonscan.com/address/${contractAddress}`} target="_blank" rel="noopener noreferrer"><code>{contractAddress}</code></a>,
-        {' '}{t.technical_details_source_code}: <a href="https://github.com/NRT314/assets/blob/main/contract.sol" target="_blank" rel="noopener noreferrer">github.com/NRT314/assets</a>
+        <i>{t.technical_details_title}</i>:
+        {' '}{t.technical_details_contract}: <a href={`https://polygonscan.com/address/${contractAddress}`} target="_blank" rel="noopener noreferrer"><code>{contractAddress}</code></a>,
+        {' '}{t.technical_details_source_code}: <a href="https://github.com/NRT314/donate-vite" target="_blank" rel="noopener noreferrer">github.com/NRT314/donate-vite</a>
+        <br />
+        <i>{t.social_networks_title}:</i> <a href="https://www.reddit.com/user/NewRussiaToken" target="_blank" rel="noopener noreferrer">Reddit</a>, <a href="https://x.com/newrussiatoken" target="_blank" rel="noopener noreferrer">X (Twitter)</a>
       </p>
     </footer>
   );

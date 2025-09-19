@@ -253,7 +253,22 @@ export default function App() {
             }, 8000);
         } catch (error) {
             console.error("Donate flow error:", error);
-            setStatus({ message: `${t.status_error} ${error.shortMessage || error.message}`, type: 'error', hash: null });
+            
+            // Получаем полное сообщение об ошибке
+            const errorMessage = error.shortMessage || error.message || '';
+
+            let userFriendlyMessage = t.status_error; // Общая ошибка по умолчанию
+
+            // Проверяем наличие ключевых фраз
+            if (errorMessage.toLowerCase().includes('user rejected')) {
+                userFriendlyMessage = t.status_error_rejected;
+
+            } else if (errorMessage.toLowerCase().includes('insufficient funds') || errorMessage.toLowerCase().includes('exceeds balance')) {
+                userFriendlyMessage = t.status_error_insufficient_funds;
+            }
+            // Здесь можно добавить другие 'else if' для обработки других частых ошибок (например, проблемы с сетью)
+
+            setStatus({ message: userFriendlyMessage, type: 'error', hash: null });
         }
     };
 
